@@ -1,0 +1,39 @@
+{
+ "horizon": 7,
+ "hybrid": true,
+ "weather_error_c": 2.0,
+ "test": {
+  "baseline (m\u00eame jour sem. derni\u00e8re)": {
+   "MAE": 6.771,
+   "RMSE": 12.057,
+   "sMAPE_%": 22.75
+  },
+  "ridge": {
+   "MAE": 2.278,
+   "RMSE": 3.282,
+   "sMAPE_%": 9.04
+  },
+  "random forest": {
+   "MAE": 2.187,
+   "RMSE": 3.157,
+   "sMAPE_%": 8.64
+  },
+  "hgb": {
+   "MAE": 2.196,
+   "RMSE": 3.181,
+   "sMAPE_%": 8.68
+  },
+  "ensemble": {
+   "MAE": 2.189,
+   "RMSE": 3.162,
+   "sMAPE_%": 8.65
+  }
+ },
+ "interval_coverage": 0.9207807118254879,
+ "weights": {
+  "ridge": 0.3338586310408822,
+  "rf": 0.3317924928059897,
+  "hgb": 0.33434887615312814
+ },
+ "interval_margin": 0.10960684054003599
+}

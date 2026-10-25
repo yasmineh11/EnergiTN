@@ -1,0 +1,14 @@
+Django>=5.0
+djangorestframework>=3.15
+pandas>=2.0
+# À ajouter à backend/requirements.txt (même environnement Python que le ML)
+djangorestframework
+pandas
+numpy
+scikit-learn
+joblib
+requests
+# plus tard, pour l'assistant IA :
+# anthropic
+
+# PostgreSQL (optionnel) : psycopg[binary]

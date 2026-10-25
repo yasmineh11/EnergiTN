@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ÉnergiTN – Connexion</title>
+<style>
+:root{--bg:#f2f6f7;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#dbe5e8;--teal:#0f7c86;--red:#c8423b}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1c22;--card:#14282f;--ink:#e6f0f2;--mute:#8fa8b1;--line:#24404a;--teal:#3ec1cc;--red:#ef7b73}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,'Segoe UI',Tahoma,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.box{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+.logo{font-weight:800;font-size:2rem;text-align:center}.logo b{color:var(--teal)}.sub{text-align:center;color:var(--mute);margin:0 0 16px}
+h2{font-size:1.1rem;margin:0}label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 4px}
+input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+button,a.l{font:inherit;cursor:pointer}:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.main{width:100%;margin-top:18px;background:var(--teal);color:#fff;border:0;border-radius:8px;padding:10px;font-weight:700}
+.lk{background:none;border:0;color:var(--teal);text-decoration:underline;padding:6px;color:var(--teal)}
+.lang{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:20px;padding:4px 14px}
+.err{color:var(--red);min-height:1.4em;font-size:.9rem;margin-top:10px}.note{color:var(--mute);font-size:.85rem;text-align:center}
+.c{text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="box">
+  <div style="text-align:end"><button class="lang" id="lang" type="button">العربية</button></div>
+  <div class="logo">Énergi<b>TN</b></div><p class="sub" data-i="sub"></p>
+  <form method="post" id="f">{% csrf_token %}
+    <h2 data-i="{% if mode == 'register' %}up{% else %}in{% endif %}"></h2>
+    {% if mode == 'register' %}<label for="nm" data-i="name"></label><input id="nm" name="name" autocomplete="name">{% endif %}
+    <label for="em" data-i="mail"></label><input id="em" name="username" type="email" dir="ltr" autocomplete="email" value="{{ email }}">
+    <label for="pw" data-i="pw"></label><input id="pw" name="password" type="password" dir="ltr" autocomplete="{% if mode == 'register' %}new-password{% else %}current-password{% endif %}">
+    {% if mode == 'register' %}<label for="pw2" data-i="pw2"></label><input id="pw2" name="password2" type="password" dir="ltr" autocomplete="new-password">{% endif %}
+    <div class="err" role="alert" id="err" data-err="{{ error }}"></div>
+    <button class="main" type="submit" data-i="{% if mode == 'register' %}reg{% else %}go{% endif %}"></button>
+  </form>
+  <div class="c">
+    {% if mode == 'register' %}<a class="lk l" href="/login/" data-i="to_in"></a>{% else %}<a class="lk l" href="/register/" data-i="to_up"></a>
+    <br><button class="lk" type="button" id="d1" data-i="d1"></button> · <button class="lk" type="button" id="d2" data-i="d2"></button>{% endif %}
+  </div>
+  <p class="note" data-i="role"></p>
+</div>
+<script>
+const T={fr:{sub:"Votre consommation d’électricité, claire et prévue.",in:"Connexion",up:"Créer un compte",name:"Nom complet",mail:"Adresse e-mail",pw:"Mot de passe",pw2:"Confirmer le mot de passe",go:"Se connecter",reg:"Créer mon compte",to_up:"Pas encore de compte ? Créer un compte",to_in:"Déjà inscrit ? Se connecter",d1:"Démo foyer",d2:"Démo opérateur",role:"Prototype académique · données simulées",
+ bad_credentials:"E-mail ou mot de passe incorrect.",e_mail:"Saisissez une adresse e-mail valide, par exemple nom@exemple.tn.",e_pw:"Le mot de passe doit contenir au moins 6 caractères.",e_name:"Saisissez votre nom.",e_match:"Les deux mots de passe ne sont pas identiques.",exists:"Un compte existe déjà avec cet e-mail."},
+ar:{sub:"استهلاكك للكهرباء، واضح ومتوقَّع.",in:"تسجيل الدخول",up:"إنشاء حساب",name:"الاسم الكامل",mail:"البريد الإلكتروني",pw:"كلمة المرور",pw2:"تأكيد كلمة المرور",go:"دخول",reg:"إنشاء حسابي",to_up:"ليس لديك حساب؟ أنشئ حسابًا",to_in:"مسجّل من قبل؟ سجّل الدخول",d1:"تجربة الأسرة",d2:"تجربة المشغّل",role:"نموذج أكاديمي · بيانات محاكاة",
+ bad_credentials:"البريد أو كلمة المرور غير صحيحة.",e_mail:"أدخل بريدًا إلكترونيًا صالحًا، مثل nom@exemple.tn.",e_pw:"يجب أن تحتوي كلمة المرور على 6 أحرف على الأقل.",e_name:"أدخل اسمك.",e_match:"كلمتا المرور غير متطابقتين.",exists:"يوجد حساب بهذا البريد."}};
+let L;try{L=localStorage.getItem('lang')}catch(e){}L=L||'fr';
+function ui(){document.documentElement.lang=L;document.documentElement.dir=L=='ar'?'rtl':'ltr';
+ document.querySelectorAll('[data-i]').forEach(e=>e.textContent=T[L][e.dataset.i]);
+ const r=document.getElementById('err');r.textContent=T[L][r.dataset.err]||'';
+ document.getElementById('lang').textContent=L=='ar'?'Français':'العربية'}
+document.getElementById('lang').onclick=()=>{L=L=='fr'?'ar':'fr';try{localStorage.setItem('lang',L)}catch(e){}ui()};
+function demo(m){document.getElementById('em').value=m;document.getElementById('pw').value='demo1234';document.getElementById('f').submit()}
+const d1=document.getElementById('d1'),d2=document.getElementById('d2');
+if(d1){d1.onclick=()=>demo('foyer@demo.tn');d2.onclick=()=>demo('analyste@demo.tn')}
+ui();
+</script>
+</body>
+</html>

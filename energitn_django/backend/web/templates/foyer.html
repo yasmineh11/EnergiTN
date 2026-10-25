@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ÉnergiTN – Espace foyer</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f6f7;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#dbe5e8;--teal:#0f7c86;--teal2:#d7eef0;--amber:#e0a019;--red:#c8423b;--redbg:#fbe9e7;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1c22;--card:#14282f;--ink:#e6f0f2;--mute:#8fa8b1;--line:#24404a;--teal:#3ec1cc;--teal2:#16393f;--amber:#f0b83c;--red:#ef7b73;--redbg:#3a1f1d}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Cairo',system-ui,sans-serif;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.logo{font-weight:800;font-size:1.5rem}.logo b{color:var(--teal)}
+.who{color:var(--mute);font-size:.9rem}
+button{font:inherit;cursor:pointer;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.lang{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:4px 14px}
+nav{display:flex;gap:6px;overflow-x:auto;margin-bottom:16px;border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;white-space:nowrap;color:var(--mute);font-weight:600}
+nav button[aria-selected=true]{color:var(--teal);border-color:var(--teal)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+h2{font-size:1.1rem;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.kpi small{color:var(--mute)}.kpi .v{font-size:2rem;font-weight:800;line-height:1.2}.kpi .u{font-size:.9rem;color:var(--mute);font-weight:400}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.seg button{background:none;border:0;padding:4px 14px}.seg button[aria-pressed=true]{background:var(--teal);color:#fff}
+svg{width:100%;height:auto;display:block}
+.alert{background:var(--redbg);border-inline-start:5px solid var(--red);border-radius:8px;padding:10px 14px;margin-bottom:10px}
+.alert.m{border-color:var(--amber);background:var(--card);border:1px solid var(--line);border-inline-start:5px solid var(--amber)}
+.tag{display:inline-block;background:var(--teal2);color:var(--teal);border-radius:12px;padding:1px 10px;font-size:.85rem;font-weight:600}
+table{width:100%;border-collapse:collapse}td,th{padding:6px 8px;text-align:start;border-bottom:1px solid var(--line)}td.n,th.n{text-align:end}
+.bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--teal)}
+.chat{height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.msg{max-width:85%;padding:8px 12px;border-radius:12px;background:var(--teal2)}.msg.u{align-self:flex-end;background:var(--teal);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chips button{border:1px solid var(--teal);background:none;color:var(--teal);border-radius:16px;padding:3px 12px;font-size:.9rem}
+.send{display:flex;gap:8px}.send input{flex:1;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.send button{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:8px 18px}
+.note{color:var(--mute);font-size:.85rem}
+.tip{display:flex;gap:10px;margin:8px 0}.tip span{color:var(--teal);font-weight:800}
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+#login .box{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+#login .logo{font-size:2rem;text-align:center}#login .sub{text-align:center;color:var(--mute);margin:0 0 16px}
+#login label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 4px}
+#login input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.pw{position:relative}.pw button{position:absolute;inset-inline-end:6px;top:5px;background:none;border:0;color:var(--teal);font-size:.85rem;padding:4px 8px}
+.main-btn{width:100%;margin-top:18px;background:var(--teal);color:#fff;border:0;border-radius:8px;padding:10px;font-weight:700}
+.link-btn{background:none;border:0;color:var(--teal);text-decoration:underline;padding:6px}
+.err{color:var(--red);min-height:1.4em;font-size:.9rem;margin-top:10px}
+.top{display:flex;gap:8px;align-items:center}
+.hid{display:none!important}
+.sec{display:none}.sec.on{display:block}
+[dir=rtl] .tick{direction:ltr}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+<header>
+  <div><div class="logo">Énergi<b>TN</b></div><div class="who" id="who"></div></div>
+  <div class="top"><button class="lang" id="lang" aria-label="Langue / اللغة">العربية</button><a class="lang" id="logout" href="/logout/" style="text-decoration:none">Déconnexion · خروج</a></div>
+</header>
+<nav role="tablist" id="nav"></nav>
+
+<section class="sec on" id="s0">
+  <div class="grid" id="kpis"></div>
+  <div class="card" style="margin-top:14px"><h2 id="t_cons"></h2>
+    <div class="seg" id="seg"></div><div id="chart"></div></div>
+  <div class="card"><h2 id="t_fc"></h2><p class="note" id="fc_note"></p><div id="fchart"></div></div>
+</section>
+
+<section class="sec" id="s1"><div class="card" id="bill"></div></section>
+
+<section class="sec" id="s2">
+  <div class="card"><h2 id="t_prof"></h2><div id="prof"></div></div>
+  <div class="card"><h2 id="t_alerts"></h2><div id="alerts"></div></div>
+</section>
+
+<section class="sec" id="s3"><div class="card"><h2 id="t_ai"></h2>
+  <div class="chat" id="chat" aria-live="polite"></div><div class="chips" id="chips"></div>
+  <div class="send"><input id="q" aria-label="Question"><button id="go"></button></div>
+  <p class="note" id="disc"></p></div></section>
+
+<section class="sec" id="s4"><div class="card" id="report"></div></section>
+
+<p class="note" id="foot"></p>
+</div>
+
+{{ data|json_script:"energitn-data" }}
+<script>
+// ---------- données fournies par Django (API / résultats ML) ----------
+const D=JSON.parse(document.getElementById('energitn-data').textContent);
+const pd=s=>new Date(s+'T12:00:00');
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const days=D.days.map(x=>({d:pd(x.date),t:Math.round(x.tmax??26),k:Math.round(x.kwh*10)/10,an:!!x.anomaly}));
+const END=days[days.length-1].d;
+const AVG=sum(days.map(x=>x.k))/days.length;
+let AN=days.map(x=>x.an).lastIndexOf(true); if(AN<0)AN=days.reduce((a,x,i)=>x.k>days[a].k?i:a,0);
+const hourly=[0.35,0.3,0.28,0.27,0.28,0.35,0.5,0.55,0.45,0.4,0.4,0.45,0.55,0.5,0.45,0.45,0.5,0.65,0.95,1.1,1.0,0.85,0.6,0.45]; // forme horaire type (hypothèse d'affichage)
+const hsum=sum(hourly);
+const yesterday=days[days.length-1];
+const hday=hourly.map(h=>Math.round(h/hsum*yesterday.k*100)/100);
+const fc=D.forecast.map(f=>({d:pd(f.date),m:Math.round(f.pred*10)/10,lo:Math.round((f.q10??f.pred*.9)*10)/10,hi:Math.round((f.q90??f.pred*1.1)*10)/10}));
+const cm=END.getMonth(), pm=(cm+11)%12;
+const octDays=days.filter(x=>x.d.getMonth()==cm), sepDays=days.filter(x=>x.d.getMonth()==pm);
+const octKwh=sum(octDays.map(x=>x.k));
+const rest=new Date(END.getFullYear(),cm+1,0).getDate()-END.getDate();
+const octProj=octKwh+sum(fc.slice(0,rest).map(x=>x.m))+Math.max(0,rest-fc.length)*(sum(fc.map(x=>x.m))/fc.length);
+const sepKwh=sum(sepDays.map(x=>x.k));
+// barème indicatif mensuel (DT/kWh) – à remplacer par le barème en vigueur
+const TR=[[100,.195],[100,.225],[100,.299],[200,.350],[1e9,.420]];
+function bill(k){let r=k,tot=0,det=[];TR.forEach((t,i)=>{const q=Math.max(0,Math.min(r,t[0]));r-=q;det.push([q,t[1]]);tot+=q*t[1]});return{tot:tot+3.5,det}}
+// ---------- textes ----------
+const T={fr:{tabs:["Tableau de bord","Facture","Profil et alertes","Assistant","Rapport"],who:"Foyer 07 · Sfax · profil « pic du soir »",
+ k1:"Hier",k2:"Prévision demain",k3:"Facture estimée d’octobre",k4:"Confiance prévision",kwh:"kWh",dt:"DT",
+ cons:"Ma consommation",seg:["Jour","Semaine","Mois"],fc:"Prévision des 7 prochains jours",fcn:"La zone claire est l’intervalle de confiance (q10–q90). Le pic attendu est en orange.",
+ peak:"Pic attendu",billT:"Estimation de la facture d’octobre",billN:"Consommation à ce jour : ",proj:"Projection fin de mois : ",tranche:"Tranche",qty:"kWh",price:"DT/kWh",total:"Total estimé (taxes et redevance fixe incluses)",
+ billW:"Barème indicatif : à remplacer par le barème tarifaire en vigueur.",
+ prof:"Mon profil de consommation",profD:"Pic du soir : 46 % de votre consommation a lieu entre 18 h et 23 h. Votre climatisation augmente votre consommation d’environ 0,55 kWh par degré au-dessus de 24 °C.",
+ ev:"Part du soir",nuit:"Part de la nuit",ete:"Rapport été/hiver",
+ al:"Mes alertes",a1:"Consommation inhabituelle",a1d:"Le %d, vous avez consommé %k kWh au lieu de %m kWh habituels (+%p %).",a2:"Journée chaude annoncée",a2d:"Température élevée en fin de semaine : prévoyez une consommation plus forte.",ask:"Demander à l’assistant",sev:"Gravité moyenne",
+ ai:"Assistant énergie",ph:"Posez votre question…",send:"Envoyer",disc:"Cet assistant fournit une aide, pas un avis professionnel. Ne touchez pas à votre installation électrique : appelez un électricien.",
+ hello:"Bonjour ! Je peux expliquer votre facture, votre alerte ou vous donner des conseils.",
+ chips:["Pourquoi ma facture augmente ?","Explique mon alerte","Comment réduire ma consommation ?"],
+ rep:"Rapport de septembre 2026",repS:"Vous avez consommé %k kWh en septembre, soit %a kWh par jour en moyenne. Facture estimée : %b DT.",repH:"Faits marquants",rh:["Un seul jour anormal détecté ce mois-ci.","Vos soirées représentent près de la moitié de votre consommation.","Les week-ends consomment environ 1,6 kWh de plus que les jours de semaine."],repR:"Recommandations",rr:["Réglez la climatisation à 26 °C le soir.","Décalez le lave-linge et le fer à repasser avant 18 h.","Vérifiez le réfrigérateur : un joint usé augmente la consommation."],
+ foot:"Prototype académique : données simulées, non reliées aux compteurs réels. TEK-UP University · ÉnergiTN",
+ r1:"Votre facture d’octobre est estimée à %b DT. La hausse vient surtout de la climatisation en soirée (journées à plus de 28 °C) et du jour anormal du %d. Réduire la clim de 1 °C le soir peut économiser environ 8 %.",
+ r2:"Le %d, votre consommation a atteint %k kWh (habituel : %m kWh). Cause possible : appareil resté allumé ou chauffe-eau. Vérifiez vos appareils ce jour-là, sans intervenir sur l’installation.",
+ r3:"Trois conseils : 1) climatisation à 26 °C, 2) usages lourds avant 18 h, 3) débranchez les appareils en veille la nuit.",r0:"Je peux répondre sur la facture, les alertes et les économies d’énergie. Essayez une des questions proposées.",
+ kw:[["factur|bill|montant","r1"],["alerte|anomal|explique","r2"],["réduire|conseil|économ|baisser","r3"]]},
+ar:{tabs:["لوحة القيادة","الفاتورة","الملف والتنبيهات","المساعد","التقرير"],who:"الأسرة 07 · صفاقس · ملف « ذروة المساء »",
+ k1:"أمس",k2:"توقع الغد",k3:"فاتورة أكتوبر المقدّرة",k4:"ثقة التوقع",kwh:"ك.و.س",dt:"د.ت",
+ cons:"استهلاكي",seg:["يوم","أسبوع","شهر"],fc:"توقع الأيام السبعة القادمة",fcn:"المنطقة الفاتحة هي مجال الثقة (q10–q90). الذروة المتوقعة باللون البرتقالي.",
+ peak:"الذروة المتوقعة",billT:"تقدير فاتورة أكتوبر",billN:"الاستهلاك حتى اليوم: ",proj:"التوقع نهاية الشهر: ",tranche:"الشريحة",qty:"ك.و.س",price:"د.ت/ك.و.س",total:"المجموع المقدّر (مع الأداءات والرسم القار)",
+ billW:"تعريفة تقريبية: يجب استبدالها بالتعريفة المعمول بها.",
+ prof:"ملف استهلاكي",profD:"ذروة المساء: 46 % من استهلاكك يكون بين 18:00 و23:00. يرتفع استهلاكك بنحو 0٫55 ك.و.س لكل درجة فوق 24 °م بسبب المكيّف.",
+ ev:"حصة المساء",nuit:"حصة الليل",ete:"نسبة الصيف/الشتاء",
+ al:"تنبيهاتي",a1:"استهلاك غير معتاد",a1d:"يوم %d استهلكت %k ك.و.س بدل %m ك.و.س المعتادة (+%p %).",a2:"يوم حار متوقع",a2d:"حرارة مرتفعة نهاية الأسبوع: توقّع استهلاكًا أكبر.",ask:"اسأل المساعد",sev:"خطورة متوسطة",
+ ai:"مساعد الطاقة",ph:"اكتب سؤالك…",send:"إرسال",disc:"هذا المساعد يقدّم مساعدة وليس رأيًا مهنيًا. لا تتدخل في التركيب الكهربائي: اتصل بكهربائي.",
+ hello:"مرحبًا! يمكنني شرح فاتورتك أو تنبيهك أو إعطاؤك نصائح.",
+ chips:["لماذا ترتفع فاتورتي؟","اشرح تنبيهي","كيف أخفض استهلاكي؟"],
+ rep:"تقرير سبتمبر 2026",repS:"استهلكت %k ك.و.س في سبتمبر، أي %a ك.و.س يوميًا في المتوسط. الفاتورة المقدّرة: %b د.ت.",repH:"أبرز الوقائع",rh:["رُصد يوم واحد غير عادي هذا الشهر.","المساء يمثّل قرابة نصف استهلاكك.","نهايات الأسبوع تستهلك حوالي 1٫6 ك.و.س إضافية."],repR:"التوصيات",rr:["اضبط المكيّف على 26 °م مساءً.","شغّل الغسالة والمكواة قبل 18:00.","افحص الثلاجة: حشية بالية ترفع الاستهلاك."],
+ foot:"نموذج أكاديمي: بيانات محاكاة غير مرتبطة بالعدادات الحقيقية. TEK-UP University · ÉnergiTN",
+ r1:"فاتورة أكتوبر مقدّرة بـ %b د.ت. الارتفاع سببه أساسًا المكيّف مساءً (أيام فوق 28 °م) واليوم غير العادي %d. خفض المكيّف درجة واحدة مساءً يوفّر حوالي 8 %.",
+ r2:"يوم %d بلغ استهلاكك %k ك.و.س (المعتاد: %m ك.و.س). السبب المحتمل: جهاز بقي شغّالًا أو سخّان الماء. تحقق من أجهزتك دون التدخل في التركيب.",
+ r3:"ثلاث نصائح: 1) المكيّف على 26 °م، 2) الأجهزة الثقيلة قبل 18:00، 3) افصل الأجهزة في وضع الاستعداد ليلًا.",r0:"يمكنني الإجابة عن الفاتورة والتنبيهات وتوفير الطاقة. جرّب أحد الأسئلة المقترحة.",
+ kw:[["فاتورة","r1"],["تنبيه|شرح|اشرح","r2"],["خفض|نصيحة|نصائح|توفير","r3"]]}};
+// ---------- état et utilitaires ----------
+let L=localStorageGet('lang')||'fr', tab=0, per=1;
+function localStorageGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function localStorageSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const $=id=>document.getElementById(id), t=()=>T[L];
+const fmtD=d=>d.toLocaleDateString(L=='ar'?'ar-TN-u-nu-latn':'fr-FR',{day:'numeric',month:'short'});
+const fmtS=d=>d.toLocaleDateString(L=='ar'?'ar-TN-u-nu-latn':'fr-FR',{weekday:'short'});
+const num=(x,n=1)=>x.toLocaleString(L=='ar'?'ar-TN-u-nu-latn':'fr-FR',{maximumFractionDigits:n});
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function bars(vals,labels,hl,color){const W=640,H=220,p=28,bw=(W-2*p)/vals.length,mx=Math.max(...vals)*1.15;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  for(let g=0;g<=3;g++){const y=H-24-(H-44)*g/3;s+=`<line x1="${p}" x2="${W-p}" y1="${y}" y2="${y}" stroke="${css('--line')}"/><text x="2" y="${y+4}" font-size="10" fill="${css('--mute')}">${num(mx*g/3,0)}</text>`}
+  vals.forEach((v,i)=>{const h=(H-44)*v/mx,x=p+i*bw+bw*.15,c=hl&&hl.includes(i)?css('--red'):color;
+    s+=`<rect x="${x}" y="${H-24-h}" width="${bw*.7}" height="${h}" rx="2" fill="${c}"/>`;
+    if(labels[i]!==''&&(vals.length<=12||i%Math.ceil(vals.length/8)==0))s+=`<text class="tick" x="${x+bw*.35}" y="${H-8}" font-size="10" text-anchor="middle" fill="${css('--mute')}">${labels[i]}</text>`});
+  return s+'</svg>'}
+function forecastSvg(){const W=640,H=220,p=34,mx=Math.max(...fc.map(f=>f.hi))*1.1,mn=Math.min(...fc.map(f=>f.lo))*.85;
+  const X=i=>p+i*(W-2*p)/6,Y=v=>H-26-(H-46)*(v-mn)/(mx-mn);
+  const up=fc.map((f,i)=>`${X(i)},${Y(f.hi)}`).join(' '),dn=fc.map((f,i)=>`${X(i)},${Y(f.lo)}`).reverse().join(' ');
+  const pk=fc.reduce((a,f,i)=>f.m>fc[a].m?i:a,0);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img"><polygon points="${up} ${dn}" fill="${css('--teal2')}"/>`;
+  s+=`<polyline points="${fc.map((f,i)=>X(i)+','+Y(f.m)).join(' ')}" fill="none" stroke="${css('--teal')}" stroke-width="3"/>`;
+  fc.forEach((f,i)=>{s+=`<circle cx="${X(i)}" cy="${Y(f.m)}" r="${i==pk?7:4}" fill="${i==pk?css('--amber'):css('--teal')}"/><text class="tick" x="${X(i)}" y="${H-8}" font-size="10" text-anchor="middle" fill="${css('--mute')}">${fmtS(f.d)}</text>`});
+  return s+`<text x="${X(pk)}" y="${Y(fc[pk].hi)-8}" font-size="11" text-anchor="middle" fill="${css('--amber')}" font-weight="700">${t().peak} ${num(fc[pk].m)}</text></svg>`}
+// ---------- rendu ----------
+function render(){const x=t();document.documentElement.lang=L;document.documentElement.dir=L=='ar'?'rtl':'ltr';
+  $('lang').textContent=L=='ar'?'Français':'العربية';$('who').textContent=D.who;$('foot').textContent=x.foot;
+  $('nav').innerHTML=x.tabs.map((n,i)=>`<button role="tab" aria-selected="${i==tab}" data-i="${i}">${n}</button>`).join('');
+  document.querySelectorAll('.sec').forEach((s,i)=>s.classList.toggle('on',i==tab));
+  const b=bill(octProj);
+  $('kpis').innerHTML=[[x.k1,num(yesterday.k),x.kwh],[x.k2,num(fc[0].m),x.kwh],[x.k3,num(b.tot,0),x.dt],[x.k4,'90',' %']].map(k=>`<div class="card kpi" style="margin:0"><small>${k[0]}</small><div class="v">${k[1]} <span class="u">${k[2]}</span></div></div>`).join('');
+  $('t_cons').textContent=x.cons;$('seg').innerHTML=x.seg.map((n,i)=>`<button aria-pressed="${i==per}" data-p="${i}">${n}</button>`).join('');
+  const col=css('--teal');
+  if(per==0)$('chart').innerHTML=bars(hday,hday.map((_,i)=>i+'h'),[18,19,20,21].filter(i=>0),col);
+  else{const n=per==1?7:30,sl=days.slice(-n);$('chart').innerHTML=bars(sl.map(d=>d.k),sl.map(d=>per==1?fmtS(d.d):fmtD(d.d)),sl.map((d,i)=>d.an?i:-1).filter(i=>i>=0),col)}
+  $('t_fc').textContent=x.fc;$('fc_note').textContent=x.fcn;$('fchart').innerHTML=forecastSvg();
+  // facture
+  $('bill').innerHTML=`<h2>${x.billT}</h2><p>${x.billN}<b>${num(octKwh,0)} ${x.kwh}</b><br>${x.proj}<b>${num(octProj,0)} ${x.kwh}</b></p>
+   <table><tr><th>${x.tranche}</th><th class="n">${x.qty}</th><th class="n">${x.price}</th><th class="n">${x.dt}</th></tr>${b.det.filter(d=>d[0]>0).map((d,i)=>`<tr><td>${i+1}</td><td class="n">${num(d[0],0)}</td><td class="n">${num(d[1],3)}</td><td class="n">${num(d[0]*d[1],1)}</td></tr>`).join('')}</table>
+   <p style="font-size:1.3rem;font-weight:800;margin:12px 0 0">${num(b.tot,1)} ${x.dt}</p><p class="note">${x.total}<br>${x.billW}</p>`;
+  // profil
+  $('t_prof').textContent=x.prof;$('prof').innerHTML=`<p><b>${D.profile.name||''}</b></p>`+[[x.ev,D.profile.evening],[x.nuit,D.profile.night],[x.ete,D.profile.summer]].filter(r=>r[1]!=null).map(r=>`<div>${r[0]} <b>${r[1]} %</b></div><div class="bar"><i style="width:${r[1]}%"></i></div>`).join('');
+  $('t_alerts').textContent=x.al;
+  const a=days[AN],typ=Math.round(AVG*10)/10,pct=Math.max(0,Math.round((a.k/AVG-1)*100));
+  $('alerts').innerHTML=`<div class="alert"><b>${x.a1}</b> <span class="tag">${x.sev}</span><br>${x.a1d.replace('%d',fmtD(a.d)).replace('%k',num(a.k)).replace('%m',num(typ)).replace('%p',pct)}<br><button class="chips-btn tag" style="border:0;margin-top:6px" data-ask="1">${x.ask}</button></div><div class="alert m"><b>${x.a2}</b><br>${x.a2d}</div>`;
+  // assistant
+  $('t_ai').textContent=x.ai;$('q').placeholder=x.ph;$('go').textContent=x.send;$('disc').textContent=x.disc;
+  $('chips').innerHTML=x.chips.map(c=>`<button>${c}</button>`).join('');
+  if(!$('chat').dataset.l||$('chat').dataset.l!=L){$('chat').dataset.l=L;$('chat').innerHTML='';say(x.hello,false)}
+  // rapport
+  const avg=sepKwh/Math.max(1,sepDays.length),bs=bill(sepKwh).tot;
+  $('report').innerHTML=`<h2>${x.rep}</h2><p>${x.repS.replace('%k',num(sepKwh,0)).replace('%a',num(avg)).replace('%b',num(bs,0))}</p><h2>${x.repH}</h2>${x.rh.map(h=>`<div class="tip"><span>•</span><div>${h}</div></div>`).join('')}<h2>${x.repR}</h2>${x.rr.map(h=>`<div class="tip"><span>✓</span><div>${h}</div></div>`).join('')}`}
+function say(m,u){const e=document.createElement('div');e.className='msg'+(u?' u':'');e.textContent=m;$('chat').appendChild(e);$('chat').scrollTop=1e5}
+function answer(q){const x=t();say(q,true);let key='r0';x.kw.forEach(k=>{if(new RegExp(k[0],'i').test(q))key=k[1]});
+  const a=days[AN],b=bill(octProj);
+  const m=x[key].replace('%b',num(b.tot,0)).replace('%d',fmtD(a.d)).replace('%k',num(a.k)).replace('%m',num(AVG));
+  setTimeout(()=>say(m,false),400)}
+document.addEventListener('click',e=>{const el=e.target;
+  if(el.closest('#nav button')){tab=+el.dataset.i;render()}
+  else if(el.dataset.p){per=+el.dataset.p;render()}
+  else if(el.closest('#chips button')){tab=3;render();answer(el.textContent)}
+  else if(el.dataset.ask){tab=3;render();answer(t().chips[1])}
+  else if(el.id=='go'){const v=$('q').value.trim();if(v){answer(v);$('q').value=''}}
+  else if(el.id=='lang'){L=L=='fr'?'ar':'fr';localStorageSet('lang',L);render()}});
+$('q').addEventListener('keydown',e=>{if(e.key=='Enter')$('go').click()});
+render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+{
+ "règle : résidu de prévision": {
+  "precision": 0.86,
+  "rappel": 0.7,
+  "F1": 0.77,
+  "tp": 78,
+  "fp": 13,
+  "fn": 33
+ },
+ "règle : conso nocturne": {
+  "precision": 0.68,
+  "rappel": 0.74,
+  "F1": 0.71,
+  "tp": 82,
+  "fp": 38,
+  "fn": 29
+ },
+ "Isolation Forest seule": {
+  "precision": 0.56,
+  "rappel": 0.88,
+  "F1": 0.68,
+  "tp": 98,
+  "fp": 78,
+  "fn": 13
+ },
+ "règles combinées (résidu OU nuit)": {
+  "precision": 0.65,
+  "rappel": 0.86,
+  "F1": 0.74,
+  "tp": 96,
+  "fp": 51,
+  "fn": 15
+ },
+ "règles + Isolation Forest": {
+  "precision": 0.57,
+  "rappel": 0.9,
+  "F1": 0.7,
+  "tp": 100,
+  "fp": 74,
+  "fn": 11
+ }
+}

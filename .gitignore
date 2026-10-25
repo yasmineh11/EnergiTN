@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+db.sqlite3
+*.joblib
+data/synthetic/readings.csv
+ml/data/
+energitn_django/backend/backend_kit/

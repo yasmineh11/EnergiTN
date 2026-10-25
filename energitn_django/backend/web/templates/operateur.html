@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ÉnergiTN – Vue opérateur</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f5;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#d6e1e5;--teal:#0f7c86;--ok:#1f9d6b;--warn:#d99a10;--bad:#d23c34;--badbg:#fbe6e4;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b181d;--card:#12262d;--ink:#e6f0f2;--mute:#8fa8b1;--line:#23404a;--teal:#3ec1cc;--ok:#38c48e;--warn:#f0b83c;--bad:#f0645b;--badbg:#3a1d1b}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Cairo',system-ui,sans-serif;line-height:1.45}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.logo{font-weight:800;font-size:1.4rem}.logo b{color:var(--teal)}.sub{color:var(--mute);font-size:.85rem}
+button,select,input{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+h2{font-size:1rem;margin:0 0 8px}
+.ctl{display:flex;gap:16px;flex-wrap:wrap;align-items:end}
+.ctl label{display:flex;flex-direction:column;font-size:.85rem;color:var(--mute);gap:2px;min-width:150px}
+.ctl select,.ctl input[type=range]{width:100%}.ctl select{padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:18px;padding:5px 14px}.btn.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.kp div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}.kp small{color:var(--mute)}.kp b{display:block;font-size:1.7rem;line-height:1.2}
+.kp .r{border-color:var(--bad);background:var(--badbg)}.kp .r b{color:var(--bad)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:12px}@media(max-width:760px){.two{grid-template-columns:1fr}}
+svg{width:100%;height:auto;display:block}
+.row{display:grid;grid-template-columns:90px 1fr 56px;gap:8px;align-items:center;padding:5px 6px;border-radius:8px;cursor:pointer;border:1px solid transparent;background:none;width:100%;text-align:start}
+.row[aria-pressed=true]{border-color:var(--teal)}.row .t{height:12px;background:var(--line);border-radius:6px;position:relative;overflow:hidden}.row .t i{display:block;height:100%;border-radius:6px}
+.row .p{text-align:end;font-weight:700}
+.al{border-inline-start:5px solid var(--bad);background:var(--badbg);border-radius:8px;padding:8px 12px;margin-bottom:8px}.al.w{border-color:var(--warn);background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-inline-end:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}td,th{padding:5px 8px;text-align:start;border-bottom:1px solid var(--line)}
+.leg{display:flex;gap:14px;font-size:.82rem;color:var(--mute);margin-top:6px;flex-wrap:wrap}.leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pl 1.6s ease-in-out infinite}
+@keyframes pl{0%,100%{transform:scale(1);opacity:.45}50%{transform:scale(1.25);opacity:.15}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+.note{color:var(--mute);font-size:.82rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><div class="logo">Énergi<b>TN</b> <span class="sub" id="role"></span></div><div class="sub" id="date"></div></div>
+  <div style="display:flex;gap:8px"><button class="btn" id="lang">العربية</button><a class="btn" href="/logout/" style="text-decoration:none">Déconnexion · خروج</a></div>
+</header>
+
+<div class="card ctl">
+  <label><span id="l_day"></span><select id="day"></select></label>
+  <label><span id="l_hour"></span><input type="range" id="hour" min="0" max="23" value="20"></label>
+  <label><span id="l_heat"></span><input type="range" id="heat" min="-4" max="12" value="0"></label>
+  <button class="btn" id="play"></button>
+</div>
+
+<div class="kp" id="kp"></div>
+
+<div class="two">
+  <div class="card"><h2 id="h_map"></h2><div id="map"></div>
+    <div class="leg" id="leg"></div></div>
+  <div class="card"><h2 id="h_rank"></h2><div id="rank"></div><h2 style="margin-top:14px" id="h_al"></h2><div id="al"></div></div>
+</div>
+
+<div class="card"><h2 id="h_heat"></h2><div id="hm"></div></div>
+<div class="two">
+  <div class="card"><h2 id="h_det"></h2><div id="det"></div></div>
+  <div class="card"><h2 id="h_an"></h2><div id="an"></div></div>
+</div>
+<p class="note" id="foot"></p>
+</div>
+
+{{ data|json_script:"energitn-data" }}
+<script>
+const D=JSON.parse(document.getElementById('energitn-data').textContent);
+const R=D.regions;
+const SH=[.72,.68,.66,.65,.67,.74,.85,.95,.98,.95,.92,.93,.97,.96,.92,.9,.95,1.05,1.18,1.25,1.22,1.1,.92,.8];
+const SHM=SH.reduce((a,b)=>a+b)/24;
+const RED=.92,AMB=.80;
+const T={fr:{role:'Vue opérateur · analyste énergétique',l_day:'Jour',l_hour:'Heure : ',l_heat:'Scénario de chaleur : ',play:'▶ Lecture',pause:'❚❚ Pause',
+ today:'Aujourd’hui',h_map:'Carte de charge (schématique)',h_rank:'Taux de charge par région',h_al:'Alertes',h_heat:'Carte de chaleur sur 24 h : région × heure',h_det:'Détail de la région',h_an:'Anomalies récurrentes (30 derniers jours)',
+ k1:'Demande nationale',k2:'Marge disponible',k3:'Zones rouges',k4:'Heures rouges prévues ce jour',mw:'MW',
+ ok:'Normal',w:'Vigilance',b:'Critique',al_b:'%r : charge à %p % de la capacité. Risque de coupure : préparer un report de charge.',al_w:'%r : charge à %p %, à surveiller.',noal:'Aucune alerte : toutes les régions sont sous le seuil de vigilance.',
+ peak:'Pic prévu',hrs:'heures au-dessus du seuil critique',cap:'Capacité',temp:'Température',seuil:'Seuil critique',
+ th:['Région','Anomalies','Type dominant'],tp:['Surconsommation nocturne','Écart avec la prévision','Pic de soir répété'],
+ foot:'Prototype académique : demande simulée à partir de la météo et de profils synthétiques, non reliée aux systèmes réels du fournisseur national d’électricité. La carte est schématique.',
+ loc:'fr-FR',d:['dim.','lun.','mar.','mer.','jeu.','ven.','sam.']},
+ar:{role:'واجهة المشغّل · محلل الطاقة',l_day:'اليوم',l_hour:'الساعة: ',l_heat:'سيناريو الحرارة: ',play:'▶ تشغيل',pause:'❚❚ إيقاف',
+ today:'اليوم',h_map:'خريطة الحمل (تخطيطية)',h_rank:'نسبة الحمل حسب الولاية',h_al:'التنبيهات',h_heat:'خريطة حرارية على 24 ساعة: الولاية × الساعة',h_det:'تفاصيل الولاية',h_an:'الشذوذات المتكررة (آخر 30 يومًا)',
+ k1:'الطلب الوطني',k2:'الهامش المتاح',k3:'مناطق حمراء',k4:'ساعات حمراء متوقعة اليوم',mw:'م.و',
+ ok:'عادي',w:'يقظة',b:'حرج',al_b:'%r: الحمل %p % من الطاقة. خطر انقطاع: حضّر تحويل الأحمال.',al_w:'%r: الحمل %p %، تحت المراقبة.',noal:'لا تنبيهات: كل الولايات تحت عتبة اليقظة.',
+ peak:'الذروة المتوقعة',hrs:'ساعات فوق العتبة الحرجة',cap:'الطاقة',temp:'الحرارة',seuil:'العتبة الحرجة',
+ th:['الولاية','الشذوذات','النوع الغالب'],tp:['استهلاك ليلي مفرط','فارق عن التوقع','ذروة مسائية متكررة'],
+ foot:'نموذج أكاديمي: طلب محاكى انطلاقًا من الطقس وملفات اصطناعية، غير مرتبط بأنظمة المزوّد الوطني الحقيقية. الخريطة تخطيطية.',
+ loc:'ar-TN-u-nu-latn',d:['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت']}};
+let L=lg('lang')||'fr',day=0,hour=20,heat=0,sel='gab',timer=null;
+function lg(k){try{return localStorage.getItem(k)}catch(e){return null}}
+const $=i=>document.getElementById(i),t=()=>T[L],nm=x=>x.toLocaleString(t().loc,{maximumFractionDigits:0});
+const col=u=>u>=RED?'var(--bad)':u>=AMB?'var(--warn)':'var(--ok)';
+const st=u=>u>=RED?'b':u>=AMB?'w':'ok';
+function temp(r,d,h){return (r.tmax[d]??30)-3+heat+3*Math.sin((h-9)/24*2*Math.PI)}
+// charge du jour (issue des prévisions ML) × forme horaire type, ajustée par le scénario de chaleur
+function util(r,d,h){return (r.util[d]||0)*SH[h]/SHM*(1+r.s*heat/20)}
+const dateOf=d=>new Date(D.dates[d]+'T12:00:00');
+function setup(){const x=t();document.documentElement.lang=L;document.documentElement.dir=L=='ar'?'rtl':'ltr';
+ $('lang').textContent=L=='ar'?'Français':'العربية';$('role').textContent=x.role;
+ for(const k of['l_day','h_map','h_rank','h_al','h_heat','h_det','h_an'])$(k).textContent=x[k];
+ $('day').innerHTML=D.dates.map((_,d)=>`<option value="${d}" ${d==day?'selected':''}>J+${d+1} · ${dateOf(d).toLocaleDateString(x.loc,{weekday:'short',day:'numeric',month:'short'})}</option>`).join('');
+ $('foot').textContent=x.foot;
+ $('leg').innerHTML=`<span><i style="background:var(--ok)"></i>${x.ok} &lt; 80 %</span><span><i style="background:var(--warn)"></i>${x.w} 80–92 %</span><span><i style="background:var(--bad)"></i>${x.b} ≥ 92 %</span>`;
+ $('play').textContent=timer?x.pause:x.play;$('play').classList.toggle('on',!!timer)}
+function render(){const x=t(),n=v=>nm(v);
+ $('l_hour').firstChild&&0;$('l_hour').textContent=x.l_hour+String(hour).padStart(2,'0')+':00';
+ $('l_heat').textContent=x.l_heat+(heat>=0?'+':'')+heat+' °C';
+ $('date').textContent=dateOf(day).toLocaleDateString(x.loc,{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' · '+String(hour).padStart(2,'0')+':00';
+ const cur=R.map(r=>({r,u:util(r,day,hour),mw:util(r,day,hour)*r.cap}));
+ const tot=cur.reduce((a,c)=>a+c.mw,0),capT=R.reduce((a,r)=>a+r.cap,0),nred=cur.filter(c=>c.u>=RED).length;
+ const rh=R.reduce((a,r)=>a+SH.filter((_,h)=>util(r,day,h)>=RED).length,0);
+ $('kp').innerHTML=`<div><small>${x.k1}</small><b>${n(tot)} <small>${x.mw}</small></b></div><div><small>${x.k2}</small><b>${n(capT-tot)} <small>${x.mw}</small></b></div><div class="${nred?'r':''}"><small>${x.k3}</small><b>${nred} / ${R.length}</b></div><div><small>${x.k4}</small><b>${rh} h</b></div>`;
+ // carte
+ let m=`<svg viewBox="0 0 300 380" dir="ltr" role="img"><path d="M118 8 L195 12 L222 58 L236 112 L240 165 L222 205 L240 240 L222 275 L196 318 L180 345 L158 372 L128 350 L118 305 L72 252 L58 215 L70 160 L92 120 L96 62 Z" fill="var(--line)" opacity=".55" stroke="var(--mute)" stroke-width="1"/>`;
+ cur.forEach(c=>{const r=c.r,rad=16+30*Math.min(c.u,1.15),k=col(c.u),s=sel==r.id;
+  m+=`<g style="cursor:pointer" data-r="${r.id}" tabindex="0" role="button" aria-label="${r[L]} ${Math.round(c.u*100)}%"><circle class="${c.u>=RED?'pulse':''}" cx="${r.x}" cy="${r.y}" r="${rad}" fill="${k}" opacity="${c.u>=RED?.45:.28}"/><circle cx="${r.x}" cy="${r.y}" r="9" fill="${k}" stroke="${s?'var(--ink)':'var(--card)'}" stroke-width="${s?3:2}"/><text x="${r.x}" y="${r.y-rad-4}" font-size="12" font-weight="700" text-anchor="middle" fill="var(--ink)">${r[L]} ${Math.round(c.u*100)}%</text></g>`});
+ $('map').innerHTML=m+'</svg>';
+ // classement
+ $('rank').innerHTML=[...cur].sort((a,b)=>b.u-a.u).map(c=>`<button class="row" data-r="${c.r.id}" aria-pressed="${sel==c.r.id}"><span>${c.r[L]}</span><span class="t"><i style="width:${Math.min(c.u,1)*100}%;background:${col(c.u)}"></i></span><span class="p" style="color:${col(c.u)}">${Math.round(c.u*100)} %</span></button>`).join('');
+ const al=[...cur].filter(c=>c.u>=AMB).sort((a,b)=>b.u-a.u);
+ $('al').innerHTML=al.length?al.map(c=>`<div class="al ${c.u>=RED?'':'w'}"><b>${x[st(c.u)]}</b> · ${(c.u>=RED?x.al_b:x.al_w).replace('%r',c.r[L]).replace('%p',Math.round(c.u*100))}</div>`).join(''):`<p class="note">${x.noal}</p>`;
+ // heatmap
+ const cw=22,ch=24,lw=70;let h=`<svg viewBox="0 0 ${lw+24*cw} ${R.length*ch+22}" dir="ltr" role="img">`;
+ R.forEach((r,i)=>{h+=`<text x="${lw-6}" y="${i*ch+16}" font-size="11" text-anchor="end" fill="var(--ink)" font-weight="${sel==r.id?800:400}">${r[L]}</text>`;
+  for(let k=0;k<24;k++){const u=util(r,day,k);h+=`<rect data-r="${r.id}" x="${lw+k*cw+1}" y="${i*ch+1}" width="${cw-2}" height="${ch-2}" rx="3" fill="${col(u)}" opacity="${u>=RED?1:u>=AMB?.8:.45}"><title>${r[L]} ${k}h : ${Math.round(u*100)} %</title></rect>`}});
+ for(let k=0;k<24;k+=3)h+=`<text x="${lw+k*cw+cw/2}" y="${R.length*ch+14}" font-size="10" text-anchor="middle" fill="var(--mute)">${k}h</text>`;
+ h+=`<rect x="${lw+hour*cw}" y="0" width="${cw}" height="${R.length*ch}" fill="none" stroke="var(--ink)" stroke-width="2" rx="3"/></svg>`;$('hm').innerHTML=h;
+ // détail
+ const r=R.find(z=>z.id==sel),us=SH.map((_,k)=>util(r,day,k)),pk=us.indexOf(Math.max(...us)),over=us.filter(u=>u>=RED).length;
+ const W=520,H=190,p=34,X=k=>p+k*(W-2*p)/23,mx=Math.max(1.1,...us)*1.05,Y=u=>H-24-(H-40)*u/mx;
+ let d=`<svg viewBox="0 0 ${W} ${H}" dir="ltr" role="img"><rect x="${p}" y="${Y(mx)}" width="${W-2*p}" height="${Y(RED)-Y(mx)}" fill="var(--bad)" opacity=".13"/><line x1="${p}" x2="${W-p}" y1="${Y(RED)}" y2="${Y(RED)}" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="${W-p}" y="${Y(RED)-4}" font-size="10" text-anchor="end" fill="var(--bad)">${x.seuil} 92 %</text><line x1="${p}" x2="${W-p}" y1="${Y(AMB)}" y2="${Y(AMB)}" stroke="var(--warn)" stroke-dasharray="3 4"/>`;
+ d+=`<polyline fill="none" stroke="var(--teal)" stroke-width="3" points="${us.map((u,k)=>X(k)+','+Y(u)).join(' ')}"/>`;
+ us.forEach((u,k)=>{if(u>=RED)d+=`<circle cx="${X(k)}" cy="${Y(u)}" r="4" fill="var(--bad)"/>`});
+ d+=`<line x1="${X(hour)}" x2="${X(hour)}" y1="10" y2="${H-24}" stroke="var(--ink)" stroke-width="1.5"/>`;
+ for(let k=0;k<24;k+=3)d+=`<text x="${X(k)}" y="${H-8}" font-size="10" text-anchor="middle" fill="var(--mute)">${k}h</text>`;
+ for(const g of[0,.5,1])d+=`<text x="2" y="${Y(g)+4}" font-size="10" fill="var(--mute)">${g*100}%</text>`;
+ $('det').innerHTML=`<p style="margin:0 0 6px"><b>${r[L]}</b> · ${x.cap} ${n(r.cap)} ${x.mw} · ${x.temp} ${Math.round(temp(r,day,hour))} °C<br>${x.peak} : <b style="color:${col(us[pk])}">${Math.round(us[pk]*100)} %</b> (${pk}h) · <b>${over}</b> ${x.hrs}</p>`+d+'</svg>';
+ // anomalies
+ const AN=D.anomalies;
+ $('an').innerHTML=`<table><tr>${x.th.map(a=>`<th>${a}</th>`).join('')}</tr>${AN.map(a=>`<tr><td>${R.find(z=>z.id==a[0])[L]}</td><td><b style="color:${a[1]>=7?'var(--bad)':a[1]>=4?'var(--warn)':'var(--ok)'}">${a[1]}</b></td><td>${a[2]}</td></tr>`).join('')}</table>`}
+document.addEventListener('click',e=>{const z=e.target.closest('[data-r]');if(z){sel=z.dataset.r;render()}
+ else if(e.target.id=='lang'){L=L=='fr'?'ar':'fr';try{localStorage.setItem('lang',L)}catch(_){ }setup();render()}
+ else if(e.target.id=='play'){if(timer){clearInterval(timer);timer=null}else timer=setInterval(()=>{hour=(hour+1)%24;$('hour').value=hour;render()},800);setup();render()}});
+document.addEventListener('keydown',e=>{if((e.key=='Enter'||e.key==' ')&&e.target.dataset&&e.target.dataset.r){sel=e.target.dataset.r;render()}});
+$('day').onchange=e=>{day=+e.target.value;render()};$('hour').oninput=e=>{hour=+e.target.value;render()};$('heat').oninput=e=>{heat=+e.target.value;render()};
+setup();render();
+</script>
+</body>
+</html>

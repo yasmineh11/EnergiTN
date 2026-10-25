@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ÉnergiTN – Administration</title>
+<style>
+:root{--bg:#eef3f5;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#d6e1e5;--teal:#0f7c86;--ok:#1f9d6b;--warn:#d99a10;--bad:#d23c34;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0b181d;--card:#12262d;--ink:#e6f0f2;--mute:#8fa8b1;--line:#23404a;--teal:#3ec1cc;--ok:#38c48e;--warn:#f0b83c;--bad:#f0645b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,'Segoe UI',Tahoma,sans-serif;line-height:1.45}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.logo{font-weight:800;font-size:1.4rem}.logo b{color:var(--teal)}.sub{color:var(--mute);font-size:.85rem}
+button,select,input,a.btn{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:18px;padding:5px 14px;text-decoration:none;display:inline-block}
+.btn.p{background:var(--teal);color:#fff;border-color:var(--teal)}.btn.d{border-color:var(--bad);color:var(--bad)}
+.top{display:flex;gap:8px;flex-wrap:wrap}
+nav{display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:14px}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 14px;color:var(--mute);font-weight:600;white-space:nowrap}nav button[aria-selected=true]{color:var(--teal);border-color:var(--teal)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;overflow-x:auto}
+h2{font-size:1rem;margin:0 0 8px}
+table{width:100%;border-collapse:collapse;font-size:.92rem}td,th{padding:6px 8px;text-align:start;border-bottom:1px solid var(--line);vertical-align:middle}
+select,input[type=text],input[type=email],input[type=password]{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.sec{display:none}.sec.on{display:block}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px}.kp div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}.kp small{color:var(--mute)}.kp b{display:block;font-size:1.7rem;line-height:1.2}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:760px){.two{grid-template-columns:1fr}}
+svg{width:100%;height:auto;display:block}
+.form{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.form label{display:flex;flex-direction:column;font-size:.82rem;color:var(--mute);gap:2px}
+.msg{min-height:1.4em;font-size:.9rem;margin-top:6px}.msg.e{color:var(--bad)}.msg.o{color:var(--ok)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;white-space:pre-wrap;font-size:.82rem;max-height:200px;overflow:auto}
+.note{color:var(--mute);font-size:.82rem}.tag{border-radius:10px;padding:1px 8px;font-size:.8rem;background:var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">{% csrf_token %}
+<header>
+  <div><div class="logo">Énergi<b>TN</b> <span class="sub" id="role"></span></div></div>
+  <div class="top"><a class="btn" href="/operateur/" id="lk_op"></a><a class="btn" href="/admin/">Django admin</a><button class="btn" id="lang">العربية</button><a class="btn" href="/logout/" id="lk_out"></a></div>
+</header>
+<nav role="tablist" id="nav"></nav>
+
+<section class="sec on" id="s0">
+  <div class="card"><h2 id="h_users"></h2><div id="users"></div><div class="msg" id="umsg" role="status"></div></div>
+  <div class="card"><h2 id="h_new"></h2><div class="form" id="newu"></div></div>
+</section>
+
+<section class="sec" id="s1">
+  <div class="card"><h2 id="h_ds"></h2><div id="ds"></div></div>
+  <div class="card"><h2 id="h_act"></h2><p class="note" id="n_act"></p>
+    <div class="top"><button class="btn p" id="a_import"></button><button class="btn d" id="a_seed"></button></div><pre id="log" hidden></pre></div>
+</section>
+
+<section class="sec" id="s2"><div id="q"></div></section>
+<p class="note" id="foot"></p>
+</div>
+{{ data|json_script:"energitn-data" }}
+<script>
+const D=JSON.parse(document.getElementById('energitn-data').textContent);
+const T={fr:{role:'Administration',op:'Vue opérateur',out:'Déconnexion · خروج',tabs:['Utilisateurs et rôles','Jeux de données','Qualité des prévisions'],
+ h_users:'Comptes utilisateurs',h_new:'Créer un compte',th:['E-mail','Nom','Rôle','Foyer lié','Actif',''],save:'Enregistrer',create:'Créer',email:'E-mail',name:'Nom',pw:'Mot de passe (6 car. min.)',role:'Rôle',hh:'Foyer lié',none:'—',
+ roles:{foyer:'Foyer',analyste:'Analyste',admin:'Administrateur'},saved:'Modifications enregistrées.',
+ e_mail:'E-mail invalide.',e_pw:'Mot de passe trop court (6 caractères minimum).',exists:'Un compte existe déjà avec cet e-mail.',e_self:'Vous ne pouvez pas vous retirer le rôle administrateur ni vous désactiver.',e_role:'Rôle invalide.',e_none:'Compte introuvable.',forbidden:'Accès refusé.',
+ h_ds:'Registre des jeux de données',dth:['Fichier','Lignes','Période','Produit par','Origine'],synth:'synthétique',
+ h_act:'Actions sur les données',n_act:'Importer lit les CSV du dossier data/ (synthetic/ et processed/) produits par la chaîne ML. Régénérer remplace TOUTES les données par la démo synthétique.',
+ a_import:'Importer les résultats ML',a_seed:'Générer les données synthétiques (démo)',conf:'Cette action remplace toutes les données actuelles par des données synthétiques de démo. Continuer ?',running:'En cours…',
+ k1:'Erreur du modèle (MAPE)',k2:'Baseline (même jour sem. passée)',k3:'Gain vs baseline',k4:'Couverture q10–q90',k5:'Prévisions évaluées',
+ g1:'Erreur par région : modèle vs baseline (%)',g2:'Erreur journalière du modèle (%) – 30 derniers jours',model:'Modèle',base:'Baseline',noq:'Aucune prévision avec valeur réelle : importez des résultats pour mesurer la qualité.',
+ qn:'Données synthétiques : de bons scores viennent de la simplicité du simulateur et ne prouvent rien sur de vrais foyers. Ce qui compte est la comparaison avec la baseline.',foot:'Prototype académique · données simulées · TEK-UP University',loc:'fr-FR'},
+ar:{role:'الإدارة',op:'واجهة المشغّل',out:'Déconnexion · خروج',tabs:['المستخدمون والأدوار','مجموعات البيانات','جودة التوقعات'],
+ h_users:'حسابات المستخدمين',h_new:'إنشاء حساب',th:['البريد','الاسم','الدور','الأسرة المرتبطة','نشط',''],save:'حفظ',create:'إنشاء',email:'البريد',name:'الاسم',pw:'كلمة المرور (6 أحرف على الأقل)',role:'الدور',hh:'الأسرة المرتبطة',none:'—',
+ roles:{foyer:'أسرة',analyste:'محلل',admin:'مدير'},saved:'تم حفظ التعديلات.',
+ e_mail:'بريد غير صالح.',e_pw:'كلمة المرور قصيرة (6 أحرف على الأقل).',exists:'يوجد حساب بهذا البريد.',e_self:'لا يمكنك سحب دور المدير من نفسك أو تعطيل حسابك.',e_role:'دور غير صالح.',e_none:'الحساب غير موجود.',forbidden:'غير مسموح.',
+ h_ds:'سجل مجموعات البيانات',dth:['الملف','الأسطر','الفترة','أُنتج بواسطة','الأصل'],synth:'اصطناعية',
+ h_act:'إجراءات على البيانات',n_act:'الاستيراد يقرأ ملفات CSV من مجلد data/ (synthetic/ وprocessed/) الناتجة عن سلسلة التعلم الآلي. التوليد يستبدل كل البيانات بالعرض الاصطناعي.',
+ a_import:'استيراد نتائج التعلم الآلي',a_seed:'توليد بيانات اصطناعية (عرض)',conf:'سيستبدل هذا الإجراء كل البيانات الحالية ببيانات اصطناعية. المتابعة؟',running:'جارٍ التنفيذ…',
+ k1:'خطأ النموذج (MAPE)',k2:'خط الأساس (نفس اليوم الأسبوع الماضي)',k3:'التحسّن مقابل خط الأساس',k4:'تغطية q10–q90',k5:'توقعات مُقيَّمة',
+ g1:'الخطأ حسب الولاية: النموذج مقابل خط الأساس (%)',g2:'الخطأ اليومي للنموذج (%) – آخر 30 يومًا',model:'النموذج',base:'خط الأساس',noq:'لا توجد توقعات مع قيم فعلية: استورد النتائج لقياس الجودة.',
+ qn:'بيانات اصطناعية: النتائج الجيدة سببها بساطة المحاكي ولا تثبت شيئًا عن أسر حقيقية. المهم هو المقارنة مع خط الأساس.',foot:'نموذج أكاديمي · بيانات محاكاة · TEK-UP University',loc:'ar-TN-u-nu-latn'}};
+let L='fr',tab=0;try{L=localStorage.getItem('lang')||'fr'}catch(e){}
+const $=i=>document.getElementById(i),t=()=>T[L],n1=(x,d=1)=>x==null?'–':x.toLocaleString(t().loc,{maximumFractionDigits:d});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const csrf=()=>document.querySelector('[name=csrfmiddlewaretoken]').value;
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},body:JSON.stringify(body)});return r.json()}
+const hhOpts=sel=>`<option value="">${t().none}</option>`+D.households.map(h=>`<option ${h==sel?'selected':''}>${h}</option>`).join('');
+const roleOpts=sel=>Object.entries(t().roles).map(([k,v])=>`<option value="${k}" ${k==sel?'selected':''}>${v}</option>`).join('');
+function msg(id,k,ok){const e=$(id);e.className='msg '+(ok?'o':'e');e.textContent=ok?t().saved:(t()[k]||k)}
+
+function render(){const x=t();document.documentElement.lang=L;document.documentElement.dir=L=='ar'?'rtl':'ltr';
+ $('role').textContent=x.role;$('lk_op').textContent=x.op;$('lk_out').textContent=x.out;$('foot').textContent=x.foot;$('lang').textContent=L=='ar'?'Français':'العربية';
+ $('nav').innerHTML=x.tabs.map((n,i)=>`<button role="tab" aria-selected="${i==tab}" data-tab="${i}">${n}</button>`).join('');
+ document.querySelectorAll('.sec').forEach((s,i)=>s.classList.toggle('on',i==tab));
+ for(const k of['h_users','h_new','h_ds','h_act'])$(k).textContent=x[k];
+ $('n_act').textContent=x.n_act;$('a_import').textContent=x.a_import;$('a_seed').textContent=x.a_seed;
+ $('users').innerHTML=`<table><tr>${x.th.map(h=>`<th>${h}</th>`).join('')}</tr>`+D.users.map(u=>`<tr data-id="${u.id}"><td dir="ltr">${esc(u.email)}</td><td>${esc(u.name)}</td>
+  <td><select class="r">${roleOpts(u.role)}</select></td><td><select class="h">${hhOpts(u.household)}</select></td><td><input type="checkbox" class="a" ${u.active?'checked':''} aria-label="actif"></td><td><button class="btn p sv">${x.save}</button></td></tr>`).join('')+'</table>';
+ $('newu').innerHTML=`<label>${x.email}<input id="n_e" type="email" dir="ltr"></label><label>${x.name}<input id="n_n" type="text"></label><label>${x.pw}<input id="n_p" type="password" dir="ltr"></label><label>${x.role}<select id="n_r">${roleOpts('foyer')}</select></label><label>${x.hh}<select id="n_h">${hhOpts('')}</select></label><button class="btn p" id="n_go">${x.create}</button><div class="msg" id="nmsg" style="flex-basis:100%"></div>`;
+ $('ds').innerHTML=`<table><tr>${x.dth.map(h=>`<th>${h}</th>`).join('')}</tr>`+D.datasets.map(d=>`<tr><td dir="ltr">${d.name}</td><td>${n1(d.rows,0)}</td><td dir="ltr">${d.span[0]?d.span[0]+' → '+d.span[1]:'–'}</td><td dir="ltr">${d.src}</td><td><span class="tag">${x.synth}</span></td></tr>`).join('')+'</table>';
+ quality()}
+function quality(){const x=t(),q=D.quality;if(!q.n){$('q').innerHTML=`<div class="card">${x.noq}</div>`;return}
+ const gain=q.base?Math.round((1-q.mape/q.base)*100):null;
+ let h=`<div class="kp"><div><small>${x.k1}</small><b>${n1(q.mape)} %</b></div><div><small>${x.k2}</small><b>${n1(q.base)} %</b></div><div><small>${x.k3}</small><b style="color:var(--ok)">${gain==null?'–':gain+' %'}</b></div><div><small>${x.k4}</small><b>${n1(q.coverage)} %</b></div><div><small>${x.k5}</small><b>${n1(q.n,0)}</b></div></div><div class="two">`;
+ const W=420,H=210,p=30,R=q.by_region,mx=Math.max(...R.map(r=>Math.max(r.mape,r.base||0)),1)*1.15,bw=(W-2*p)/R.length;
+ let s=`<svg viewBox="0 0 ${W} ${H}" dir="ltr" role="img">`;
+ R.forEach((r,i)=>{const x0=p+i*bw,h1=(H-50)*r.mape/mx,h2=(H-50)*(r.base||0)/mx;
+  s+=`<rect x="${x0+4}" y="${H-24-h1}" width="${bw/2-5}" height="${h1}" rx="2" fill="var(--teal)"/><rect x="${x0+bw/2}" y="${H-24-h2}" width="${bw/2-5}" height="${h2}" rx="2" fill="var(--warn)"/><text x="${x0+bw/2}" y="${H-8}" font-size="10" text-anchor="middle" fill="var(--mute)">${r[L]}</text><text x="${x0+bw/4+2}" y="${H-28-h1}" font-size="9" text-anchor="middle" fill="var(--ink)">${n1(r.mape)}</text>`});
+ s+=`</svg><div class="note"><span style="color:var(--teal)">■</span> ${x.model} · <span style="color:var(--warn)">■</span> ${x.base}</div>`;
+ h+=`<div class="card"><h2>${x.g1}</h2>${s}</div>`;
+ const B=q.by_day.filter(d=>d.mape!=null),mx2=Math.max(...B.map(d=>d.mape),1)*1.15,X=i=>p+i*(W-2*p)/Math.max(1,B.length-1),Y=v=>H-24-(H-44)*v/mx2;
+ let l=`<svg viewBox="0 0 ${W} ${H}" dir="ltr" role="img"><polyline fill="none" stroke="var(--teal)" stroke-width="3" points="${B.map((d,i)=>X(i)+','+Y(d.mape)).join(' ')}"/>`;
+ for(const g of[0,.5,1])l+=`<text x="2" y="${Y(mx2*g/1.15)+4}" font-size="10" fill="var(--mute)">${n1(mx2*g/1.15,0)}</text>`;
+ l+=`<text x="${p}" y="${H-8}" font-size="10" fill="var(--mute)">${B[0]?B[0].date.slice(5):''}</text><text x="${W-p}" y="${H-8}" font-size="10" text-anchor="end" fill="var(--mute)">${B.length?B[B.length-1].date.slice(5):''}</text></svg>`;
+ $('q').innerHTML=h+`<div class="card"><h2>${x.g2}</h2>${l}</div></div><p class="note">${x.qn}</p>`}
+document.addEventListener('click',async e=>{const el=e.target;
+ if(el.dataset.tab){tab=+el.dataset.tab;render()}
+ else if(el.id=='lang'){L=L=='fr'?'ar':'fr';try{localStorage.setItem('lang',L)}catch(_){}render()}
+ else if(el.classList.contains('sv')){const tr=el.closest('tr');
+  const r=await post('/gestion/user/',{id:+tr.dataset.id,role:tr.querySelector('.r').value,household:tr.querySelector('.h').value,active:tr.querySelector('.a').checked});
+  if(r.ok){D.users=r.users;render();msg('umsg','',true)}else msg('umsg',r.error)}
+ else if(el.id=='n_go'){const r=await post('/gestion/user/',{email:$('n_e').value,name:$('n_n').value,password:$('n_p').value,role:$('n_r').value,household:$('n_h').value});
+  if(r.ok){D.users=r.users;render();msg('umsg','',true)}else msg('nmsg',r.error)}
+ else if(el.id=='a_import'||el.id=='a_seed'){const seed=el.id=='a_seed';if(seed&&!confirm(t().conf))return;
+  $('log').hidden=false;$('log').textContent=t().running;const r=await post('/gestion/action/',{action:seed?'seed':'import'});
+  $('log').textContent=r.log||r.error||'';if(r.ok){Object.assign(D,r.data);render();$('log').hidden=false;$('log').textContent=r.log}}});
+render();
+</script>
+</body>
+</html>
