@@ -14,13 +14,25 @@ from .services import dotnet_client, llm_client
 
 
 def household_for(request, code):
-    """Un foyer ne voit que SES données ; analyste et administrateur voient tout."""
-    h = get_object_or_404(Household.objects.select_related("region"), code=code)
-    role = getattr(request.user, "role", "household")
-    if request.user.is_superuser or role in ("analyst", "admin") or h.owner_id == request.user.id:
-        return h
-    raise PermissionDenied("Ce foyer ne vous appartient pas.")
+    h = get_object_or_404(
+        Household.objects.select_related("region"),
+        code=code
+    )
 
+    user = request.user
+
+    is_analyst = user.groups.filter(
+        name="Analyste"
+    ).exists()
+
+    is_admin = user.is_superuser
+
+    if is_admin or is_analyst or h.owner_id == user.id:
+        return h
+
+    raise PermissionDenied(
+        "Vous n'avez pas accès à ce foyer."
+    )
 
 @api_view(["GET"])
 def consumption(request, code):

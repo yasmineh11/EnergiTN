@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 from .regions import region_of
-
+from energy.models import Household as EnergyHousehold
 
 class Household(models.Model):
     household_id = models.CharField(max_length=80, unique=True)
@@ -66,10 +66,31 @@ class Alert(models.Model):
 
 
 class UserProfile(models.Model):
-    ROLES = [("foyer", "Foyer"), ("analyste", "Analyste énergétique"), ("admin", "Administrateur")]
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
-    role = models.CharField(max_length=20, choices=ROLES, default="foyer")
-    household = models.ForeignKey(Household, null=True, blank=True, on_delete=models.SET_NULL)
+    ROLES = [
+        ("foyer", "Foyer"),
+        ("analyste", "Analyste énergétique"),
+        ("admin", "Administrateur"),
+    ]
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile"
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=ROLES,
+        default="foyer"
+    )
+
+    household = models.ForeignKey(
+        EnergyHousehold,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="user_profiles"
+    )
 
     def __str__(self):
         return f"{self.user} ({self.role})"

@@ -12,7 +12,7 @@ CANDIDATES = {
     "tmax": ["tmax", "temp_max", "temperature_max", "temperature"],
     "date": ["date", "target_date", "day"],
     "pred": ["y_pred", "pred", "predicted_kwh", "forecast", "prediction"],
-    "actual": ["y_true", "actual", "actual_kwh", "real", "kwh"],
+    "actual": ["y_true", "actual", "actual_kwh", "real", "kwh_day", "kwh"],
     "q10": ["q10", "y_q10", "pred_q10", "lower"],
     "q90": ["q90", "y_q90", "pred_q90", "upper"],
     "type": ["type", "anomaly_type", "detector"],
@@ -91,7 +91,8 @@ class Command(BaseCommand):
                     HouseholdProfile.objects.update_or_create(household=hh[str(r["household_id"])], defaults={
                         "cluster": int(r["cluster"]), "profil": str(r["profil"]),
                         "evening_share": num(r["evening_share"]) if "evening_share" in df.columns else None,
-                        "night_share": num(r["night_share"]) if "night_share" in df.columns else None})
+                        "night_share": num(r["night_share"]) if "night_share" in df.columns else None,
+                        "summer_ratio": num(r["summer_ratio"]) if "summer_ratio" in df.columns else None})
             self.stdout.write(f"{len(df)} profils")
 
         if (proc / "anomalies_flagged.csv").exists():

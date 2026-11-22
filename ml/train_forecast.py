@@ -68,9 +68,10 @@ def main():
     a = ap.parse_args(); H, HYB = a.horizon, not a.no_hybrid
     MODELS.mkdir(exist_ok=True)
     d = pd.read_csv(PROC / "daily.csv", parse_dates=["date"])
+    d["tmax_c"], d["cdd_c"], d["heatwave_c"] = d.tmax, d.cdd, d.heatwave      # températures OBSERVÉES (pour l'entraînement)
     if a.weather_error > 0:
         # En production on ne connaît PAS la température du jour prévu : on n'a qu'une prévision météo, avec une erreur.
-        # On la simule sur validation et test (l'entraînement reste sur les températures observées).
+        # On la simule sur validation et test (l'entraînement reste sur les températures observées : seules les prévisions de validation et de test sont bruitées).
         m_ = d.date > TRAIN_END
         d.loc[m_, "tmax"] = d.loc[m_, "tmax"] + np.random.default_rng(0).normal(0, a.weather_error, int(m_.sum()))
         d["cdd"], d["heatwave"] = (d.tmax - 24).clip(lower=0), (d.tmax >= 38).astype(int)
@@ -93,7 +94,8 @@ def main():
         return x
 
     def fit_all(train):
-        t = train[train.anomaly_day == 0]
+        t = train[train.anomaly_day == 0].copy()
+        t["tmax"], t["cdd"], t["heatwave"] = t.tmax_c, t.cdd_c, t.heatwave_c     # on apprend avec la météo observée, jamais avec la prévision bruitée
         bundle = {"lin": fit_linear_base(t) if HYB else ({}, np.zeros(3))}
         t = with_base(t, bundle)
         y = t.kwh_day - (t.lin_base if HYB else 0)                       # les arbres apprennent ce que la droite n'explique pas

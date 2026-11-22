@@ -57,7 +57,12 @@ def main():
         top = row.drop(labels=[x for x in row.index if x not in LABELS]).abs().sort_values(ascending=False).index[:2]
         names[c] = " + ".join(LABELS[f][0 if row[f] > 0 else 1] for f in top)
     F["profil"] = F.cluster.map(names)
-    out = F.reset_index()[["household_id", "cluster", "profil"]]
+    out = F.reset_index()[["household_id", "cluster", "profil"]].copy()
+    # Colonnes lues par l'interface Django (barres du profil, en pourcentage, entre 0 et 100)
+    out["evening_share"] = (100 * F.evening_share.values).round().astype(int)          # part de la consommation entre 18h et 23h
+    out["night_share"] = (100 * F.night_share.values).round().astype(int)              # part de la consommation entre 0h et 5h
+    out["summer_ratio"] = (100 * F.summer_ratio.values / (1 + F.summer_ratio.values)).round().astype(int)
+    # summer_ratio (page) = poids de l'été : 100 x été / (été + hiver), conso moyenne juillet-août contre janvier-février
     out.to_csv(PROC / "profiles.csv", index=False)
 
     print("\nCentres des groupes (valeurs moyennes) :")
