@@ -1,0 +1,50 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'land_title' %}{% endblock %}
+{% block shell %}
+<header class="land-nav">
+  <a class="brand" href="/"><svg style="color:var(--ink)"><use href="#logo"/></svg><span><b>ÉnergiTN</b><small>{% t 'tagline_short' %}</small></span></a>
+  <div class="ph-actions">
+    <a class="btn btn-ghost" href="/langue/{% if lang == 'ar' %}fr{% else %}ar{% endif %}/?next=/" lang="{% if lang == 'ar' %}fr{% else %}ar{% endif %}">{% if lang == 'ar' %}Français{% else %}العربية{% endif %}</a>
+    <a class="btn" href="/login/">{% t 'login' %}</a>
+  </div>
+</header>
+<main>
+  <section class="land-hero">
+    <div>
+      <h1>{% t 'land_h1' %}</h1>
+      <p class="lead">{% t 'land_lead' %}</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/register/">{% t 'create_account' %}</a>
+        <a class="btn" href="/login/#demo">{% t 'try_demo' %}</a>
+      </div>
+    </div>
+    <div class="hero-card hero-map">
+      <div class="hc-head">
+        <div><b>{% t 'map_card_title' %}</b><div class="mute small">{% t 'map_card_sub' %}</div></div>
+        <span class="badge b-syn">{% t 'synthetic' %}</span>
+      </div>
+      {% include "partials/tn_map.html" with tone="light" %}
+      <div class="map-stats">
+        <div><b class="num">6</b><span>{% t 'map_stat_regions' %}</span></div>
+        <div><b class="num">{{ hero.n_households|default:"30" }}</b><span>{% t 'map_stat_households' %}</span></div>
+        <div><b class="num">J+7</b><span>{% t 'map_stat_horizon' %}</span></div>
+      </div>
+    </div>
+  </section>
+
+ 
+
+  <section class="land-band">
+    <div class="land-sec">
+      <h2>{% t 'land_roles_h' %}</h2>
+      <div class="roles">
+        <div class="role"><h3>{% t 'role_foyer' %}</h3><ul><li>{% t 'rf1' %}</li><li>{% t 'rf2' %}</li><li>{% t 'rf3' %}</li><li>{% t 'rf4' %}</li></ul></div>
+        <div class="role"><h3>{% t 'role_analyste' %}</h3><ul><li>{% t 'ra1' %}</li><li>{% t 'ra2' %}</li><li>{% t 'ra3' %}</li></ul></div>
+        <div class="role"><h3>{% t 'role_admin' %}</h3><ul><li>{% t 'rd1' %}</li><li>{% t 'rd2' %}</li><li>{% t 'rd3' %}</li></ul></div>
+      </div>
+    </div>
+  </section>
+  <footer class="land-sec small mute" style="padding-top:24px">{% t 'foot_proto' %}</footer>
+</main>
+{% endblock %}
+

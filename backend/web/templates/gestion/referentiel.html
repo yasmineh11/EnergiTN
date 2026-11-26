@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_reference' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_reference' %}</h1><p>{% t 'reference_p' %}</p></div></div>
+<div class="grid g-main">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'tariff' %}</h2><p class="small" id="src"></p></div></div>
+    <form id="tf">
+      <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'label' %}</th><th class="n">{% t 'max_year' %}</th><th class="n">DT/kWh</th><th></th></tr></thead><tbody id="bands"></tbody></table></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" type="button" id="add"><svg class="i"><use href="#i-plus"/></svg>{% t 'add_band' %}</button><button class="btn btn-primary" type="submit">{% t 'save' %}</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>{% t 'tariff_rule_h' %}</h2>
+    <p class="small" style="margin-top:8px">{% t 'tariff_rule_p' %}</p>
+    <div class="notice warn mt"><svg class="i"><use href="#i-info"/></svg><span class="small">{% t 'tariff_verify' %}</span></div>
+  </section>
+</div>
+{% endblock %}
+{% block data %}{{ data|json_script:"tr" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('tr'), {t, $, esc} = EN;
+$('#src').textContent = D.source;
+const row = b => `<tr><td><input class="input" name="label" value="${esc(b.label || '')}" required></td><td class="n"><input class="input" name="max" type="number" min="0" value="${b.max ?? ''}" placeholder="∞" dir="ltr" style="max-width:130px"></td>
+  <td class="n"><input class="input" name="price" type="number" step="0.001" min="0" value="${b.price ?? ''}" required dir="ltr" style="max-width:110px"></td><td><button class="btn btn-sm btn-ghost del" type="button" aria-label="${t('delete')}"><svg class="i"><use href="#i-x"/></svg></button></td></tr>`;
+$('#bands').innerHTML = D.bands.map(row).join('');
+$('#add').onclick = () => $('#bands').insertAdjacentHTML('beforeend', row({}));
+$('#bands').addEventListener('click', e => { const b = e.target.closest('.del'); if (b) b.closest('tr').remove(); });
+$('#tf').addEventListener('submit', async e => { e.preventDefault();
+  const bands = [...$('#bands').querySelectorAll('tr')].map(tr => ({label: tr.querySelector('[name=label]').value, max: tr.querySelector('[name=max]').value, price: tr.querySelector('[name=price]').value}));
+  const r = await EN.post('/gestion/tarifs/', {bands}); EN.toast(r.ok ? t('saved') : t(r.error), !r.ok); });
+})();
+</script>
+{% endblock %}

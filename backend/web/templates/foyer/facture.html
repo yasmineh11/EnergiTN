@@ -1,0 +1,98 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_bill' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1 id="h1"></h1><p>{% t 'bill_p' %}</p></div></div>
+
+<div class="grid g-main">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'estimate' %}</h2><p id="est-note"></p></div><span class="badge b-syn">{% t 'excl_tax' %}</span></div>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="num" style="font-size:3rem;font-weight:600;letter-spacing:-.03em" id="total"></span><span class="mute" style="font-size:1.2rem">DT</span></div>
+    <div class="chart mt" style="height:120px"><canvas id="c-build" role="img" aria-label="{% t 'estimate' %}"></canvas></div>
+    <div class="legend"><span><i style="background:var(--s1)"></i>{% t 'consumed' %}</span><span><i style="background:var(--s4)"></i>{% t 'forecast_model' %}</span><span><i style="background:var(--line-strong)"></i>{% t 'extrapolated' %}</span></div>
+    <dl class="kv mt" id="detail"></dl>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'tariff' %}</h2><p class="tiny" id="src"></p></div></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'band' %}</th><th class="n">DT/kWh</th></tr></thead><tbody id="bands"></tbody></table></div>
+    <div id="band-insight" class="mt"></div>
+  </section>
+</div>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'simulator' %}</h2><p>{% t 'simulator_p' %}</p></div></div>
+  <div class="grid g2" style="align-items:center">
+    <div>
+      <label class="field"><span>{% t 'reduce_by' %} <b class="num" id="pct-v">10 %</b></span><input type="range" id="pct" min="0" max="40" value="10" step="1"></label>
+      <p class="small mute" style="margin-top:10px" id="sim-how"></p>
+    </div>
+    <dl class="kv" id="sim"></dl>
+  </div>
+</section>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'bills_history' %}</h2><p>{% t 'bills_history_p' %}</p></div></div>
+  <div class="chart sm"><canvas id="c-hist" role="img" aria-label="{% t 'bills_history' %}"></canvas></div>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"bill" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('bill'), {t, num, date, $} = EN, F = D.facts, M = F.month, B = M.bill;
+const mon = t('m' + (M.label_idx + 1));
+$('#h1').textContent = t('bill_of', {m: mon + ' ' + M.year});
+$('#total').textContent = num(B.total, 2);
+$('#est-note').textContent = M.days_elapsed ? t('est_note', {c: num(M.consumed_kwh, 0), d: M.days_elapsed, p: num(M.projection_kwh, 0), n: M.days_in_month})
+  : t('est_note0', {f: M.forecast_days, p: num(M.projection_kwh, 0), n: M.days_in_month});
+$('#src').textContent = B.source;
+const bandLabel = b => b.max == null ? t('band_over', {v: num(B.bands[B.bands.length - 2].max, 0)}) : t('band_upto', {v: num(b.max, 0)});
+$('#bands').innerHTML = B.bands.map((b, i) => `<tr${i === B.band ? ' style="background:var(--bleu-soft)"' : ''}><td>${bandLabel(b)}${i === B.band ? ` <span class="badge b-low">${t('your_band')}</span>` : ''}</td><td class="n num">${num(b.price, 3)}</td></tr>`).join('');
+let ins = `<p class="small">${t('annualized', {v: num(B.annual, 0)})}</p>`;
+if (B.next_band) ins += `<div class="notice warn"><svg class="i"><use href="#i-alert"/></svg><span>${t('band_warn', {k: num(B.next_band.room_kwh, 0), d: num(B.next_band.jump_dt, 0)})}</span></div>`;
+if (B.prev_band) ins += `<div class="notice ok" style="margin-top:8px"><svg class="i"><use href="#i-leaf"/></svg><span>${t('band_save', {k: num(B.prev_band.save_kwh, 0), d: num(B.prev_band.saving_dt, 0)})}</span></div>`;
+$('#band-insight').innerHTML = ins;
+
+// décomposition : consommé / prévu par le modèle / extrapolé
+const consumed = M.consumed_kwh, fcSum = F.forecast.filter(f => f.date.slice(0, 7) === `${M.year}-${String(M.label_idx + 1).padStart(2, '0')}`).reduce((a, f) => a + f.pred, 0);
+const extra = Math.max(0, M.projection_kwh - consumed - fcSum);
+$('#detail').innerHTML = [[t('consumed'), num(consumed, 0) + ' kWh'], [t('forecast_model'), num(fcSum, 0) + ' kWh'], [t('extrapolated'), num(extra, 0) + ' kWh'],
+  [t('unit_price'), num(B.price, 3) + ' DT/kWh'], [t('estimate'), num(B.total, 2) + ' DT']].map(([a, b]) => `<dt>${a}</dt><dd class="num">${b}</dd>`).join('');
+function build() {
+  const c = EN.css;
+  EN.chart('c-build', {type: 'bar', data: {labels: ['kWh'], datasets: [
+    {label: t('consumed'), data: [consumed], backgroundColor: c('--s1')}, {label: t('forecast_model'), data: [fcSum], backgroundColor: c('--s4')},
+    {label: t('extrapolated'), data: [extra], backgroundColor: c('--line-strong')}]},
+    options: {indexAxis: 'y', scales: {x: {stacked: true, title: {display: true, text: 'kWh'}}, y: {stacked: true, display: false}},
+      datasets: {bar: {borderColor: c('--surface'), borderWidth: 2, borderSkipped: false, barThickness: 34}}, interaction: {mode: 'nearest', intersect: true},
+      plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${num(x.raw, 0)} kWh`}}}}});
+}
+build();
+
+// simulateur : même logique que billing.py (tranche selon la consommation annualisée, prix appliqué à tout)
+function price(kwh) {
+  const ann = kwh * 365 / M.days_in_month;
+  const i = B.bands.findIndex(b => b.max == null || ann <= b.max);
+  return {i, total: kwh * B.bands[i].price};
+}
+function sim() {
+  const p = +$('#pct').value; $('#pct-v').textContent = p + ' %';
+  const k = M.projection_kwh * (1 - p / 100), r = price(k), save = B.total - r.total;
+  $('#sim').innerHTML = `<dt>${t('new_consumption')}</dt><dd class="num">${num(k, 0)} kWh</dd><dt>${t('new_bill')}</dt><dd class="num">${num(r.total, 2)} DT</dd>
+    <dt>${t('saving')}</dt><dd class="num" style="color:var(--olive)">${num(save, 2)} DT</dd><dt>${t('band')}</dt><dd>${bandLabel(B.bands[r.i])}${r.i < B.band ? ` <span class="badge b-ok">${t('lower_band')}</span>` : ''}</dd>`;
+  const hs = F.profile && F.profile.heat_sens;
+  $('#sim-how').textContent = hs ? t('sim_how', {k: num(M.projection_kwh * p / 100 / M.days_in_month, 1), h: num(hs, 2)}) : '';
+}
+$('#pct').addEventListener('input', sim); sim();
+
+function hist() {
+  const c = EN.css, ms = D.months.filter(m => m.days >= 25);
+  EN.chart('c-hist', {type: 'bar', data: {labels: ms.map(m => EN.month(m.month, {month: 'short', year: '2-digit'})),
+    datasets: [{data: ms.map(m => { const nd = new Date(+m.month.slice(0, 4), +m.month.slice(5), 0).getDate(); const ann = m.kwh * 365 / nd; const b = B.bands.find(x => x.max == null || ann <= x.max); return +(m.kwh * b.price).toFixed(2); }),
+      backgroundColor: c('--s1'), maxBarThickness: 30}]},
+    options: {scales: {x: {grid: {display: false}}, y: {beginAtZero: true, title: {display: true, text: 'DT'}}}, plugins: {tooltip: {callbacks: {label: x => `${num(x.raw, 0)} DT · ${num(ms[x.dataIndex].kwh, 0)} kWh`}}}}});
+}
+hist();
+document.addEventListener('themechange', () => { build(); hist(); });
+})();
+</script>
+{% endblock %}

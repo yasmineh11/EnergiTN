@@ -63,7 +63,19 @@ def main():
     out["night_share"] = (100 * F.night_share.values).round().astype(int)              # part de la consommation entre 0h et 5h
     out["summer_ratio"] = (100 * F.summer_ratio.values / (1 + F.summer_ratio.values)).round().astype(int)
     # summer_ratio (page) = poids de l'été : 100 x été / (été + hiver), conso moyenne juillet-août contre janvier-février
+    # ---- ajouts pour Django (sans changer le regroupement) : les autres caractéristiques du profil
+    out["summer_winter_ratio"] = F.summer_ratio.values.round(3)       # rapport été / hiver brut (« 2,5 × »)
+    for c in ("mean_day", "load_factor", "heat_sens", "weekend_ratio"):
+        out[c] = F[c].values.round(3)
     out.to_csv(PROC / "profiles.csv", index=False)
+
+    # journée type (kWh moyen par heure) : page « Profil » du foyer et forme horaire régionale de l'analyste
+    rows = []
+    for season, months in (("all", range(1, 13)), ("summer", (6, 7, 8, 9)), ("winter", (12, 1, 2))):
+        sh = r[r.month.isin(list(months))].groupby(["household_id", "hour"]).kwh.mean().unstack()
+        sh.columns = [f"h{c:02d}" for c in sh.columns]
+        rows.append(sh.round(4).assign(season=season).reset_index())
+    pd.concat(rows)[["household_id", "season"] + [f"h{h:02d}" for h in range(24)]].to_csv(PROC / "hourly_profiles.csv", index=False)
 
     print("\nCentres des groupes (valeurs moyennes) :")
     print(F.groupby("cluster").mean(numeric_only=True).round(2).to_string())
@@ -72,6 +84,15 @@ def main():
     print("\nCorrespondance avec les personas du simulateur (vérification) :")
     print(pd.crosstab(m.profil, m.persona).to_string())
     print("Adjusted Rand Index vs personas :", round(adjusted_rand_score(m.persona, m.cluster), 2), "(1 = identique)")
+    # métriques lues par Django (page « Qualité des modèles »)
+    import json
+    from datetime import datetime
+    (ROOT / "models").mkdir(exist_ok=True)
+    with open(ROOT / "models" / "profiles_metrics.json", "w", encoding="utf-8") as fh:
+        json.dump({"k": int(k), "k_auto": not a.k, "silhouette": {str(x): round(float(y), 3) for x, y in scores.items()},
+                   "ari_vs_personas": round(float(adjusted_rand_score(m.persona, m.cluster)), 2),
+                   "names": {str(c): n for c, n in names.items()}, "n_households": int(len(F)),
+                   "trained_at": datetime.now().isoformat(timespec="seconds")}, fh, ensure_ascii=False, indent=1)
     print(f"-> {PROC / 'profiles.csv'}")
 
 if __name__ == "__main__":

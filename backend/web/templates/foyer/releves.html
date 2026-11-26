@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_readings' %}{% endblock %}
+{% block content %}
+<div class="ph">
+  <div><h1>{% t 'nav_readings' %}</h1><p>{% t 'readings_p' %}</p></div>
+  <span class="datastamp"><span class="dot"></span><span id="stamp"></span></span>
+</div>
+{% if result %}
+<div class="notice {% if result.alerts %}warn{% else %}ok{% endif %}" role="status" style="margin-bottom:18px">
+  <svg class="i"><use href="#i-{% if result.alerts %}alert{% else %}check{% endif %}"/></svg>
+  <div><b>{% t 'saved_n' n=result.saved %}</b>
+    {% if result.alerts %}<br>{% for a in result.alerts %}{% t 'live_alert' d=a.date k=a.kwh e=a.expected_kwh %}<br>{% endfor %}<a href="/foyer/assistant/?q={% t 'chip_alert' %}">{% t 'ask_assistant' %}</a>{% else %} {% t 'no_anomaly_saved' %}{% endif %}
+    {% if result.forecasts %}<br>{% t 'fc_updated' %}{% endif %}</div>
+</div>
+{% endif %}
+{% if errors %}<div class="notice err" role="alert" style="margin-bottom:18px"><svg class="i"><use href="#i-alert"/></svg><div>{% for e in errors %}{{ e }}<br>{% endfor %}</div></div>{% endif %}
+
+<div class="grid g2">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'manual_entry' %}</h2><p>{% t 'manual_p' %}</p></div></div>
+    <form method="post" class="form-row">{% csrf_token %}<input type="hidden" name="action" value="manual">
+      <label class="field"><span>{% t 'date' %}</span><input class="input" type="date" name="date" value="{{ next_date }}" max="{{ today }}" required dir="ltr"></label>
+      <label class="field"><span>{% t 'kwh_day' %}</span><input class="input" type="number" name="kwh" step="0.01" min="0" max="200" required dir="ltr" inputmode="decimal" placeholder="12,5"></label>
+      <button class="btn btn-primary" type="submit"><svg class="i"><use href="#i-check"/></svg>{% t 'save' %}</button>
+    </form>
+    <p class="small mute" style="margin-top:12px">{% t 'manual_hint' %}</p>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'file_import' %}</h2><p>{% t 'file_p' %}</p></div></div>
+    <form method="post" enctype="multipart/form-data" id="imp">{% csrf_token %}<input type="hidden" name="action" value="file">
+      <label class="drop" id="drop"><svg class="i"><use href="#i-upload"/></svg><br><b id="drop-txt">{% t 'drop' %}</b><br><span class="small">{% t 'drop_fmt' %}</span>
+        <input type="file" name="file" accept=".csv,text/csv" class="sr" id="file" required></label>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-primary" type="submit"><svg class="i"><use href="#i-upload"/></svg>{% t 'import' %}</button>
+        <a class="btn btn-ghost" href="/foyer/releves/modele.csv">{% t 'download_template' %}</a></div>
+    </form>
+  </section>
+</div>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'history' %}</h2><p id="count"></p></div></div>
+  <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'date' %}</th><th class="n">kWh</th><th class="n">{% t 'tmax' %}</th><th>{% t 'source' %}</th><th>{% t 'status' %}</th></tr></thead><tbody id="rows"></tbody></table></div>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"rd" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('rd'), {t, num, date, $} = EN;
+$('#stamp').textContent = D.last ? t('last_reading_on', {d: date(D.last, {day: 'numeric', month: 'long', year: 'numeric'})}) : t('no_reading');
+$('#count').textContent = t('n_readings', {n: num(D.count, 0)});
+const src = {ml: ['b-syn', 'src_ml'], saisie: ['b-low', 'src_manual'], import: ['b-ok', 'src_import']};
+$('#rows').innerHTML = D.rows.length ? D.rows.map(r => `<tr><td>${date(r.date, {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'})}</td><td class="n num">${num(r.kwh, 2)}</td><td class="n num">${r.tmax != null ? num(r.tmax, 0) + ' °C' : '–'}</td>
+  <td><span class="badge ${src[r.source][0]}">${t(src[r.source][1])}</span></td><td>${r.alert ? EN.sevBadge(r.alert) : '<span class="badge b-ok"><svg class="i"><use href="#i-check"/></svg>' + t('normal') + '</span>'}</td></tr>`).join('')
+  : `<tr><td colspan="5" class="empty">${t('no_reading')}</td></tr>`;
+const drop = $('#drop'), file = $('#file');
+file.addEventListener('change', () => { if (file.files[0]) $('#drop-txt').textContent = file.files[0].name; });
+['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => { file.files = ev.dataTransfer.files; file.dispatchEvent(new Event('change')); });
+})();
+</script>
+{% endblock %}

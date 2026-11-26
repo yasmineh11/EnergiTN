@@ -1,0 +1,57 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_assistant' %}{% endblock %}
+{% block content %}
+<div class="ph">
+  <div><h1>{% t 'nav_assistant' %}</h1><p>{% t 'assistant_p' %}</p></div>
+  <span class="badge {% if llm %}b-ok{% else %}b-low{% endif %}"><svg class="i"><use href="#i-{% if llm %}bolt{% else %}settings{% endif %}"/></svg>{% if llm %}{% t 'engine_llm' %}{% else %}{% t 'engine_rules' %}{% endif %}</span>
+</div>
+<div class="grid g-main">
+  <section class="panel chat">
+    <div class="chips" id="chips"></div>
+    <div class="chat-log" id="log" aria-live="polite"></div>
+    <form class="composer" id="ask"><label class="sr" for="q">{% t 'your_question' %}</label>
+      <input class="input" id="q" autocomplete="off" maxlength="500" placeholder="{% t 'ask_ph' %}">
+      <button class="btn btn-primary" type="submit"><svg class="i"><use href="#i-send"/></svg><span class="sr">{% t 'send' %}</span></button></form>
+    <p class="tiny mute" style="margin:10px 0 0">{% t 'disclaimer' %}</p>
+  </section>
+  <aside class="panel">
+    <h2>{% t 'what_it_knows' %}</h2>
+    <p class="small mute">{% t 'what_it_knows_p' %}</p>
+    <dl class="kv" id="facts" style="margin-top:12px"></dl>
+    <form method="post" action="/foyer/assistant/effacer/" style="margin-top:18px">{% csrf_token %}<button class="btn btn-sm btn-ghost" type="submit"><svg class="i"><use href="#i-x"/></svg>{% t 'clear_history' %}</button></form>
+  </aside>
+</div>
+{% endblock %}
+{% block data %}{{ data|json_script:"as" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('as'), {t, num, date, $, esc} = EN, F = D.facts;
+const log = $('#log');
+function add(role, text, engine) {
+  const e = document.createElement('div'); e.className = 'msg ' + role; e.textContent = text;
+  if (role === 'assistant' && engine) { const m = document.createElement('span'); m.className = 'meta'; m.textContent = t(engine === 'llm' ? 'engine_llm' : 'engine_rules'); e.appendChild(m); }
+  log.appendChild(e); log.scrollTop = log.scrollHeight; return e;
+}
+if (!D.history.length) add('assistant', t('hello_assistant'));
+D.history.forEach(m => add(m.role, m.content, m.engine));
+$('#chips').innerHTML = ['chip_bill', 'chip_alert', 'chip_fc', 'chip_reduce', 'chip_compare'].map(k => `<button type="button" class="chip">${t(k)}</button>`).join('');
+async function ask(q) {
+  q = q.trim(); if (!q) return;
+  add('user', q); const typing = add('assistant', t('typing')); typing.classList.add('typing');
+  const r = await EN.post('/foyer/assistant/ask/', {q});
+  typing.remove();
+  if (r.answer) add('assistant', r.answer, r.engine); else add('assistant', t(r.error || 'e_server'));
+}
+$('#chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) ask(b.textContent); });
+$('#ask').addEventListener('submit', e => { e.preventDefault(); const v = $('#q').value; $('#q').value = ''; ask(v); });
+if (F && F.has_data) {
+  const M = F.month;
+  $('#facts').innerHTML = [[t('data_until_short'), date(F.data_until, {day: 'numeric', month: 'short', year: 'numeric'})], [t('avg_30d'), num(F.avg_30d) + ' kWh'],
+    [t('bill_of', {m: t('m' + (M.label_idx + 1))}), num(M.bill.total, 0) + ' DT'], [F.forecast[0] && EN.isTomorrow(F.forecast[0].date) ? t('tomorrow_fc') : t('fc_j1'), F.forecast[0] ? num(F.forecast[0].pred) + ' kWh' : '–'],
+    [t('profile_cap'), F.profile ? F.profile.name : '–'], [t('open_alerts'), F.alerts_open ?? F.alerts.length]].map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join('');
+}
+const q0 = new URLSearchParams(location.search).get('q'); if (q0) { history.replaceState(null, '', location.pathname); ask(q0); }
+})();
+</script>
+{% endblock %}

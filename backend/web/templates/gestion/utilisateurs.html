@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_users' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_users' %}</h1><p>{% t 'users_p' %}</p></div>
+  <div class="ph-actions"><a class="btn" href="/admin/">{% t 'django_admin' %}</a><button class="btn btn-primary" type="button" id="open-new"><svg class="i"><use href="#i-plus"/></svg>{% t 'new_account' %}</button></div></div>
+<section class="metrics" id="kp"></section>
+
+<section class="panel mt" id="new-panel" hidden>
+  <div class="panel-head"><h2>{% t 'new_account' %}</h2></div>
+  <form class="form-row" id="newu">
+    <label class="field"><span>{% t 'email' %}</span><input class="input" name="email" type="email" dir="ltr" required></label>
+    <label class="field"><span>{% t 'full_name' %}</span><input class="input" name="name"></label>
+    <label class="field"><span>{% t 'password' %}</span><input class="input" name="password" type="password" dir="ltr" minlength="8" required></label>
+    <label class="field"><span>{% t 'role' %}</span><select class="input" name="role" id="n-role"></select></label>
+    <label class="field"><span>{% t 'linked_hh' %}</span><select class="input" name="household" id="n-hh"></select></label>
+    <button class="btn btn-primary" type="submit">{% t 'create' %}</button>
+  </form>
+  <div class="err-box" id="nerr" role="alert"></div>
+</section>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'accounts' %}</h2><p id="ucount"></p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="input" id="search" type="search" placeholder="{% t 'search' %}" style="min-height:36px;width:220px">
+      <div class="seg" id="rf" role="group"><button type="button" data-r="" aria-pressed="true">{% t 'all' %}</button><button type="button" data-r="foyer">{% t 'role_foyer' %}</button><button type="button" data-r="analyste">{% t 'role_analyste' %}</button><button type="button" data-r="admin">{% t 'role_admin' %}</button></div></div></div>
+  <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'account' %}</th><th>{% t 'role' %}</th><th>{% t 'linked_hh' %}</th><th>{% t 'active' %}</th><th>{% t 'last_login' %}</th><th></th></tr></thead><tbody id="users"></tbody></table></div>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"us" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('us'), {t, num, date, $, esc} = EN;
+const roles = ['foyer', 'analyste', 'admin'];
+let rf = '', q = '';
+const roleOpts = s => roles.map(r => `<option value="${r}" ${r === s ? 'selected' : ''}>${t('role_' + r)}</option>`).join('');
+const hhOpts = s => `<option value="">—</option>` + D.households.map(h => `<option value="${h.id}" ${h.id === s ? 'selected' : ''} ${h.linked && h.id !== s ? 'disabled' : ''}>${h.id} · ${esc(h.region)}${h.linked && h.id !== s ? ' (' + t('taken') + ')' : ''}</option>`).join('');
+function kp() { const O = D.overview;
+  $('#kp').innerHTML = `<div class="metric"><div class="lab">${t('accounts')}</div><div class="val num">${O.users}</div><div class="sub">${O.active} ${t('active_pl')}</div></div>
+  <div class="metric"><div class="lab">${t('role_foyer_pl')}</div><div class="val num">${O.roles.foyer || 0}</div><div class="sub">${t(O.linked > 1 ? 'hh_linked' : 'hh_linked1', {a: O.linked, b: O.households})}</div></div>
+  <div class="metric"><div class="lab">${t('open_alerts')}</div><div class="val num">${O.alerts_open}</div><div class="sub">${t('all_households')}</div></div>
+  <div class="metric accent"><div class="lab">${t('ml_status')}</div><div class="val" style="font-size:1.3rem">${O.models_ok ? t('models_loaded') : t('models_missing')}</div><div class="sub">${num(O.future, 0)} ${t('future_fc')} · ${O.llm ? t('engine_llm') : t('engine_rules')}</div></div>`; }
+function render() {
+  const U = D.users.filter(u => (!rf || u.role === rf) && (!q || (u.email + ' ' + u.name).toLowerCase().includes(q)));
+  $('#ucount').textContent = t('n_accounts', {n: U.length});
+  document.querySelectorAll('#rf button').forEach(b => b.setAttribute('aria-pressed', b.dataset.r === rf));
+  $('#users').innerHTML = U.map(u => `<tr data-id="${u.id}"><td><b>${esc(u.name || '—')}</b><br><span class="small mute" dir="ltr">${esc(u.email)}</span></td>
+    <td><select class="input r" style="min-height:36px">${roleOpts(u.role)}</select></td>
+    <td><select class="input h" style="min-height:36px" ${u.role !== 'foyer' ? 'disabled' : ''}>${hhOpts(u.household)}</select></td>
+    <td><label class="check"><input type="checkbox" class="a" ${u.active ? 'checked' : ''}><span class="sr">${t('active')}</span></label></td>
+    <td class="small mute">${u.last_login ? date(u.last_login, {day: 'numeric', month: 'short', year: 'numeric'}) : t('never')}</td>
+    <td><button class="btn btn-sm sv">${t('save')}</button></td></tr>`).join('');
+}
+$('#n-role').innerHTML = roleOpts('foyer'); $('#n-hh').innerHTML = hhOpts('');
+$('#open-new').onclick = () => { $('#new-panel').hidden = !$('#new-panel').hidden; };
+$('#search').oninput = e => { q = e.target.value.toLowerCase(); render(); };
+$('#rf').onclick = e => { const b = e.target.closest('button'); if (b) { rf = b.dataset.r; render(); } };
+$('#users').addEventListener('change', e => { if (e.target.classList.contains('r')) { const tr = e.target.closest('tr'); tr.querySelector('.h').disabled = e.target.value !== 'foyer'; } });
+$('#users').addEventListener('click', async e => {
+  const b = e.target.closest('.sv'); if (!b) return; const tr = b.closest('tr'); b.disabled = true;
+  const r = await EN.post('/gestion/user/', {id: +tr.dataset.id, role: tr.querySelector('.r').value, household: tr.querySelector('.h').value, active: tr.querySelector('.a').checked});
+  b.disabled = false;
+  if (r.ok) { Object.assign(D, r.data); kp(); render(); EN.toast(t('saved')); } else EN.toast(t(r.error), true);
+});
+$('#newu').addEventListener('submit', async e => {
+  e.preventDefault(); const f = new FormData(e.target);
+  const r = await EN.post('/gestion/user/', Object.fromEntries(f));
+  if (r.ok) { Object.assign(D, r.data); e.target.reset(); $('#nerr').textContent = ''; $('#new-panel').hidden = true; kp(); render(); EN.toast(t('account_created')); }
+  else $('#nerr').textContent = (r.messages || []).join(' ') || t(r.error);
+});
+kp(); render();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% load static tr %}<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block title %}{% t 'app' %}{% endblock %} · ÉnergiTN</title>
+<meta name="description" content="{% t 'meta_desc' %}">
+<script>try{var th=localStorage.getItem('theme');if(th)document.documentElement.dataset.theme=th}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%2313213c'/%3E%3Cpath d='M21.6 9 14 21h5.5l-2 10 8-12.5h-5.5z' fill='%23e9a400'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="{% static 'css/energitn.css' %}">
+{% block head %}{% endblock %}
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% include "partials/icons.html" %}
+{% block shell %}
+<div class="app">
+  <aside class="side" id="side" aria-label="{% t 'nav_main' %}">
+    <a class="brand" href="/"><svg><use href="#logo"/></svg><span><b>ÉnergiTN</b><small>{% t 'tagline_short' %}</small></span></a>
+    <nav class="nav">
+      {% for g in nav %}
+      <div class="nav-group">
+        {% if g.title %}<div class="nav-title">{{ g.title }}</div>{% endif %}
+        {% for it in g.items %}
+        <a href="{{ it.url }}"{% if it.active %} aria-current="page"{% endif %}><svg class="i"><use href="#{{ it.icon }}"/></svg>{{ it.label }}{% if it.count %}<span class="count num">{{ it.count }}</span>{% endif %}</a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </nav>
+    <div class="side-foot">
+      <div class="who"><span class="avatar">{{ initials }}</span><span><b>{{ display_name }}</b><span>{{ role_label }}</span></span></div>
+      <div class="side-tools">
+        <a class="tool" href="/langue/{% if lang == 'ar' %}fr{% else %}ar{% endif %}/?next={{ request.get_full_path|urlencode }}" lang="{% if lang == 'ar' %}fr{% else %}ar{% endif %}"><svg class="i"><use href="#i-globe"/></svg>{% if lang == 'ar' %}Français{% else %}العربية{% endif %}</a>
+        <button class="tool" id="theme-btn" type="button" aria-label="{% t 'theme' %}"><svg class="i"><use href="#i-moon"/></svg></button>
+        <form method="post" action="/logout/">{% csrf_token %}<button class="tool" type="submit"><svg class="i"><use href="#i-logout"/></svg>{% t 'logout' %}</button></form>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button id="nav-btn" type="button" aria-label="{% t 'menu' %}" aria-controls="side" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg></button>
+      <a class="brand" href="/"><svg><use href="#logo"/></svg><b>ÉnergiTN</b></a>
+    </header>
+    <div class="deskbar">
+      <nav class="crumb" aria-label="fil d'Ariane"><span>{{ space_label }}</span>{% if page_label %}<svg class="i"><use href="#i-chev"/></svg><b>{{ page_label }}</b>{% endif %}</nav>
+      <div class="deskbar-r">
+        <span class="mlpill {% if ml_ok %}on{% else %}off{% endif %}" title="forecast_h1.joblib · forecast_h7.joblib"><span class="pulse"></span>{% if ml_ok %}{% t 'ml_live' %}{% else %}{% t 'ml_off' %}{% endif %}</span>
+        <span class="today" id="today"></span>
+      </div>
+    </div>
+    <main class="page" id="contenu">
+      {% if messages %}{% for m in messages %}<div class="notice {% if m.tags == 'error' %}err{% else %}ok{% endif %}" role="status" style="margin-bottom:16px"><svg class="i"><use href="#i-{% if m.tags == 'error' %}alert{% else %}check{% endif %}"/></svg><span>{{ m }}</span></div>{% endfor %}{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="foot">{% t 'foot_proto' %}</footer>
+  </div>
+</div>
+{% endblock %}
+{{ i18n|json_script:"i18n" }}
+{% block data %}{% endblock %}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script src="{% static 'js/core.js' %}"></script>
+<script>(function(){var e=document.getElementById('today');if(e)e.textContent=new Date().toLocaleDateString(EN.loc,{weekday:'long',day:'numeric',month:'long',year:'numeric'})})()</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

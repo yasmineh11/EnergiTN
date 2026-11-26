@@ -1,0 +1,83 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_data' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_data' %}</h1><p>{% t 'data_p' %}</p></div></div>
+
+<section class="panel">
+  <div class="panel-head"><div><h2>{% t 'pipeline_h' %}</h2><p>{% t 'pipeline_p' %}</p></div><span class="badge b-syn" dir="ltr" id="sdir"></span></div>
+  <div class="grid g2">
+    <div>
+      <div id="steps" style="display:grid;gap:8px"></div>
+      <div class="form-row mt" id="gen-opts" style="grid-template-columns:1fr 1fr">
+        <label class="field"><span>{% t 'n_households' %}</span><input class="input" type="number" id="o-hh" value="30" min="6" max="200"></label>
+        <label class="field"><span>{% t 'seed' %}</span><input class="input" type="number" id="o-seed" value="42"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" class="mt">
+        <button class="btn btn-primary" id="run"><svg class="i"><use href="#i-play"/></svg>{% t 'run_pipeline' %}</button>
+        <button class="btn" id="quick" title="{% t 'quick_p' %}">{% t 'quick_import' %}</button>
+      </div>
+      <p class="small mute" style="margin-top:10px">{% t 'pipeline_warn' %}</p>
+    </div>
+    <div><div class="panel-head" style="margin-bottom:8px"><h3 id="run-title">{% t 'last_run' %}</h3><span id="run-status"></span></div><pre class="log" id="log">—</pre></div>
+  </div>
+</section>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'registry_h' %}</h2><p>{% t 'registry_p' %}</p></div></div>
+  <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'file' %}</th><th class="n">{% t 'rows_db' %}</th><th>{% t 'period' %}</th><th>{% t 'produced_by' %}</th><th>{% t 'origin' %}</th><th>{% t 'on_disk' %}</th></tr></thead><tbody id="ds"></tbody></table></div>
+</section>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'weather_fc_h' %}</h2><p>{% t 'weather_fc_p' %}</p></div></div>
+  <form id="wx" class="form-row" enctype="multipart/form-data"><label class="field"><span>{% t 'csv_file' %}</span><input class="input" type="file" name="file" accept=".csv" required></label>
+    <button class="btn btn-primary" type="submit"><svg class="i"><use href="#i-upload"/></svg>{% t 'import' %}</button></form>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"dd" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('dd'), {t, num, date, $, esc} = EN, P = D.pipeline;
+$('#sdir').textContent = P.scripts_dir;
+const def = ['prepare', 'forecast_h1', 'forecast_h7', 'profiles', 'anomalies', 'import', 'inference'];
+$('#steps').innerHTML = P.steps.map((s, i) => `<label class="check" style="justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:8px 12px">
+  <span style="display:flex;gap:10px;align-items:center"><input type="checkbox" value="${s.id}" ${def.includes(s.id) ? 'checked' : ''}><span><b class="small">${i + 1}. ${t('step_' + s.id)}</b>${s.script ? `<br><code class="tiny mute" dir="ltr">${s.script}</code>` : `<br><span class="tiny mute">Django</span>`}</span></span></label>`).join('');
+const gen = () => $('#gen-opts').style.display = $('#steps input[value=generate]').checked ? 'grid' : 'none';
+$('#steps').addEventListener('change', gen); gen();
+const kinds = {synthetic: ['b-syn', 'k_synth'], observed: ['b-ok', 'k_obs'], reference: ['b-low', 'k_ref'], model: ['b-mid', 'k_model'], user: ['b-low', 'k_user']};
+const size = b => b > 1e6 ? num(b / 1e6, 1) + ' Mo' : num(b / 1e3, 0) + ' Ko';
+function ds() {
+  $('#ds').innerHTML = D.datasets.map(d => `<tr><td><b dir="ltr">${esc(d.name)}</b></td><td class="n num">${d.rows == null ? '–' : num(d.rows, 0)}</td>
+   <td class="num small">${d.span[0] ? date(d.span[0], {day: 'numeric', month: 'short', year: '2-digit'}) + ' – ' + date(d.span[1], {day: 'numeric', month: 'short', year: '2-digit'}) : '–'}</td>
+   <td class="small" dir="ltr">${esc(d.src)}</td><td><span class="badge ${kinds[d.kind][0]}">${t(kinds[d.kind][1])}</span></td>
+   <td>${d.file.exists === null ? '–' : d.file.exists ? `<span class="badge b-ok"><svg class="i"><use href="#i-check"/></svg>${size(d.file.size)}</span>` : `<span class="badge b-high">${t('missing')}</span>`}</td></tr>`).join('');
+}
+ds();
+let poll = null;
+function showRun(r) {
+  if (!r) return;
+  $('#log').textContent = r.log || '…'; $('#log').scrollTop = 1e6;
+  $('#run-status').innerHTML = `<span class="badge ${r.status === 'ok' ? 'b-ok' : r.status === 'error' ? 'b-high' : 'b-mid'}">${t('run_' + r.status)}</span>`;
+  $('#run-title').textContent = t('run_of', {d: new Date(r.started_at).toLocaleString(EN.loc, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})});
+  const busy = r.status === 'running'; $('#run').disabled = busy; $('#quick').disabled = busy;
+  if (busy && !poll) poll = setInterval(async () => { const x = await EN.get('/gestion/pipeline/' + r.id + '/'); showRun(x.run); if (x.run.status !== 'running') { clearInterval(poll); poll = null; D.datasets = x.datasets; ds(); EN.toast(t(x.run.status === 'ok' ? 'pipeline_done' : 'pipeline_failed'), x.run.status !== 'ok'); } }, 2000);
+}
+showRun(P.runs[0]);
+async function start(steps) {
+  const r = await EN.post('/gestion/pipeline/', {steps, households: +$('#o-hh').value, seed: +$('#o-seed').value});
+  if (r.run) showRun(r.run); else EN.toast(t(r.error), true);
+}
+$('#run').onclick = () => {
+  const steps = [...document.querySelectorAll('#steps input:checked')].map(i => i.value);
+  if (!steps.length) return;
+  if (steps.includes('generate') && !confirm(t('confirm_generate'))) return;
+  start(steps);
+};
+$('#quick').onclick = () => start(['import', 'inference']);
+$('#wx').addEventListener('submit', async e => {
+  e.preventDefault(); const r = await EN.post('/gestion/meteo/', new FormData(e.target), true);
+  if (r.ok) { EN.toast(t('weather_ok', {n: r.rows, f: r.forecasts})); e.target.reset(); } else EN.toast(r.message || t(r.error), true);
+});
+})();
+</script>
+{% endblock %}
