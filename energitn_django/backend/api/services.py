@@ -16,14 +16,30 @@ from energy.models import (
 from .regions import REGIONS, region_of
 
 
+# ==========================================================
+# OUTILS COMMUNS
+# ==========================================================
+
+def as_float(value, default=None):
+    """Convertit une valeur numérique Django en float exploitable en JS."""
+    if value is None:
+        return default
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def role_of(user):
+    """Retourne le rôle associé à l'utilisateur connecté."""
     if not user.is_authenticated:
         return None
 
-    p = getattr(user, "profile", None)
+    profile = getattr(user, "profile", None)
 
-    if p:
-        return p.role
+    if profile:
+        return profile.role
 
     return "admin" if user.is_superuser else None
 
@@ -33,72 +49,85 @@ def role_of(user):
 # ==========================================================
 
 def foyer_payload(h):
+    """Construit les données du tableau de bord d'un foyer."""
 
-    # Prévisions J+1
-    fc = list(
+    forecasts = list(
         Forecast.objects.filter(
             household=h,
-            horizon=1
+            horizon=1,
         ).order_by("-date")[:7]
     )[::-1]
 
-    # Consommations historiques
-    qs = DailyConsumption.objects.filter(household=h)
+    history_qs = DailyConsumption.objects.filter(
+        household=h
+    )
 
-    if fc:
-        qs = qs.filter(date__lt=fc[0].date)
+    if forecasts:
+        history_qs = history_qs.filter(
+            date__lt=forecasts[0].date
+        )
 
-    hist = list(qs.order_by("-date")[:90])[::-1]
+    history = list(
+        history_qs.order_by("-date")[:90]
+    )[::-1]
 
-    if not hist or not fc:
+    if not history or not forecasts:
         return None
 
-    # Dates avec alertes
-    flagged = set(
+    flagged_dates = set(
         Alert.objects.filter(
             household=h
         ).values_list("date", flat=True)
     )
 
-    # Profil énergétique
-    p = getattr(h, "profile", None)
+    profile = getattr(h, "profile", None)
 
-    # Région
-    reg = region_of(h.region.name)
+    region_name_raw = (
+        h.region.name if h.region else ""
+    )
 
-    region_name = reg["fr"] if reg else h.region.name
+    region = (
+        region_of(region_name_raw)
+        if region_name_raw else None
+    )
+
+    region_name = (
+        region["fr"]
+        if region
+        else (region_name_raw or "Région inconnue")
+    )
 
     who = f"{h.code} · {region_name}"
 
-    if p:
-        who += f" · {p.label}"
+    if profile:
+        who += f" · {profile.label}"
 
     return {
         "who": who,
 
         "days": [
             {
-                "date": d.date.isoformat(),
-                "kwh": d.kwh,
-                "tmax": d.tmax,
-                "anomaly": d.date in flagged,
+                "date": day.date.isoformat(),
+                "kwh": as_float(day.kwh, 0),
+                "tmax": as_float(day.tmax),
+                "anomaly": day.date in flagged_dates,
             }
-            for d in hist
+            for day in history
         ],
 
         "forecast": [
             {
-                "date": f.date.isoformat(),
-                "pred": f.predicted,
-                "q10": f.low,
-                "q90": f.high,
+                "date": forecast.date.isoformat(),
+                "pred": as_float(forecast.predicted),
+                "q10": as_float(forecast.low),
+                "q90": as_float(forecast.high),
             }
-            for f in fc
+            for forecast in forecasts
         ],
 
         "profile": {
-            "name": p.label if p else "",
-            "cluster": p.cluster if p else None,
+            "name": profile.label if profile else "",
+            "cluster": profile.cluster if profile else None,
             "evening": None,
             "night": None,
             "summer": None,
@@ -111,129 +140,256 @@ def foyer_payload(h):
 # ==========================================================
 
 def operator_payload():
+    """
+    Construit les données globales de l'analyste.
 
-    dates = sorted(
-        Forecast.objects.filter(
-            horizon=1
-        ).values_list(
-            "date", flat=True
-        ).distinct().order_by("-date")[:7]
+    Format retourné :
+    {
+        dates: [...],
+        regions: [
+            {
+                id, fr, ar, cap, s, x, y,
+                util: [...],
+                tmax: [...]
+            }
+        ],
+        anomalies: [
+            [region_id, nombre, type_dominant]
+        ]
+    }
+    """
+
+    # ------------------------------------------------------
+    # Dates des prévisions J+1
+    # ------------------------------------------------------
+
+    dates = list(
+        Forecast.objects.filter(horizon=1)
+        .values_list("date", flat=True)
+        .distinct()
+        .order_by("-date")[:7]
     )
 
+    dates.sort()
+
     if not dates:
-        return None
+        return {
+            "dates": [],
+            "regions": [],
+            "anomalies": [],
+        }
 
-    by_reg = {}
+    # ------------------------------------------------------
+    # Regrouper les foyers par région
+    # ------------------------------------------------------
 
-    for h in Household.objects.select_related("region").all():
+    households_by_region = {}
 
-        reg = region_of(h.region.name)
+    households = Household.objects.select_related(
+        "region"
+    ).all()
 
-        if reg:
-            by_reg.setdefault(reg["id"], []).append(h.id)
+    for household in households:
 
-    regions = []
+        if not household.region:
+            continue
 
-    for reg in REGIONS:
+        region = region_of(household.region.name)
 
-        ids = by_reg.get(reg["id"], [])
+        if region:
+            households_by_region.setdefault(
+                region["id"], []
+            ).append(household.id)
 
-        hist = DailyConsumption.objects.filter(
-            household_id__in=ids
+    # ------------------------------------------------------
+    # Calcul des indicateurs de chaque région
+    # ------------------------------------------------------
+
+    regions_data = []
+
+    for region in REGIONS:
+
+        household_ids = households_by_region.get(
+            region["id"], []
         )
 
+        history = DailyConsumption.objects.filter(
+            household_id__in=household_ids
+        )
+
+        # Moyenne journalière historique maximale.
         top = (
-            hist.values("date")
+            history
+            .filter(kwh__isnull=False)
+            .values("date")
             .annotate(m=Avg("kwh"))
             .order_by("-m")
             .first()
         )
 
-        ref = top["m"] * 1.25 if top else None
+        top_mean = as_float(
+            top.get("m") if top else None
+        )
 
-        fm = {
-            r["date"]: r["m"]
-            for r in (
-                Forecast.objects.filter(
-                    household_id__in=ids,
-                    horizon=1,
-                    date__in=dates,
+        # Référence utilisée pour normaliser la charge.
+        reference = (
+            top_mean * 1.25
+            if top_mean is not None and top_mean > 0
+            else None
+        )
+
+        # Moyennes des prévisions par date.
+        forecast_rows = (
+            Forecast.objects.filter(
+                household_id__in=household_ids,
+                horizon=1,
+                date__in=dates,
+                predicted__isnull=False,
+            )
+            .values("date")
+            .annotate(m=Avg("predicted"))
+        )
+
+        forecast_means = {
+            row["date"]: as_float(row["m"])
+            for row in forecast_rows
+        }
+
+        # Température moyenne par date.
+        temperature_rows = (
+            history
+            .filter(
+                date__in=dates,
+                tmax__isnull=False,
+            )
+            .values("date")
+            .annotate(t=Avg("tmax"))
+        )
+
+        temperature_means = {
+            row["date"]: as_float(row["t"])
+            for row in temperature_rows
+        }
+
+        # Taux de charge journalier.
+        utilization = []
+
+        for day in dates:
+
+            forecast_mean = forecast_means.get(day)
+
+            if (
+                reference is not None
+                and reference > 0
+                and forecast_mean is not None
+            ):
+                utilization.append(
+                    round(forecast_mean / reference, 4)
                 )
-                .values("date")
-                .annotate(m=Avg("predicted"))
-            )
-        }
+            else:
+                # None signifie que les données sont absentes.
+                utilization.append(None)
 
-        tm = {
-            r["date"]: r["t"]
-            for r in (
-                hist.filter(date__in=dates)
-                .values("date")
-                .annotate(t=Avg("tmax"))
-            )
-        }
+        regions_data.append({
+            "id": region["id"],
+            "fr": region["fr"],
+            "ar": region["ar"],
+            "cap": as_float(region["cap"], 0),
+            "s": as_float(region["s"], 0),
+            "x": as_float(region["x"], 0),
+            "y": as_float(region["y"], 0),
 
-        regions.append({
-            **{
-                k: reg[k]
-                for k in ("id", "fr", "ar", "cap", "x", "y", "s")
-            },
-
-            "util": [
-                round(fm[d] / ref, 4)
-                if ref and d in fm else 0
-                for d in dates
-            ],
+            "util": utilization,
 
             "tmax": [
-                tm.get(d)
-                for d in dates
+                temperature_means.get(day)
+                for day in dates
             ],
         })
 
-    # Analyse des alertes
+    # ------------------------------------------------------
+    # Anomalies des 30 derniers jours disponibles
+    # ------------------------------------------------------
+
     anomalies = []
 
-    last = Alert.objects.order_by(
-        "-date"
-    ).values_list("date", flat=True).first()
+    last_alert_date = (
+        Alert.objects.order_by("-date")
+        .values_list("date", flat=True)
+        .first()
+    )
 
-    cnt, typ = {}, {}
+    count_by_region = {}
+    types_by_region = {}
 
-    if last:
+    if last_alert_date:
 
-        alerts = Alert.objects.filter(
-            date__gte=last - timedelta(days=30)
-        ).select_related("household__region")
+        alerts = (
+            Alert.objects.filter(
+                date__gte=last_alert_date - timedelta(days=30),
+                date__lte=last_alert_date,
+            )
+            .select_related("household__region")
+        )
 
-        for a in alerts:
+        for alert in alerts:
 
-            reg = region_of(a.household.region.name)
+            if not alert.household.region:
+                continue
 
-            if reg:
-                rid = reg["id"]
+            region = region_of(
+                alert.household.region.name
+            )
 
-                cnt[rid] = cnt.get(rid, 0) + 1
+            if not region:
+                continue
 
-                typ.setdefault(rid, {}).setdefault(a.kind, 0)
+            region_id = region["id"]
 
-                typ[rid][a.kind] += 1
+            count_by_region[region_id] = (
+                count_by_region.get(region_id, 0) + 1
+            )
 
-    for reg in REGIONS:
+            alert_type = alert.kind or "Autre"
 
-        t = typ.get(reg["id"])
+            types_by_region.setdefault(
+                region_id, {}
+            )
+
+            types_by_region[region_id][alert_type] = (
+                types_by_region[region_id].get(
+                    alert_type, 0
+                ) + 1
+            )
+
+    for region in REGIONS:
+
+        type_counts = types_by_region.get(
+            region["id"], {}
+        )
+
+        dominant_type = (
+            max(type_counts, key=type_counts.get)
+            if type_counts
+            else "–"
+        )
 
         anomalies.append([
-            reg["id"],
-            cnt.get(reg["id"], 0),
-            max(t, key=t.get) if t else "–",
+            region["id"],
+            count_by_region.get(region["id"], 0),
+            dominant_type,
         ])
 
-    anomalies.sort(key=lambda a: -a[1])
+    anomalies.sort(
+        key=lambda item: -item[1]
+    )
 
     return {
-        "dates": [d.isoformat() for d in dates],
-        "regions": regions,
+        "dates": [
+            day.isoformat()
+            for day in dates
+        ],
+        "regions": regions_data,
         "anomalies": anomalies,
     }
 
@@ -243,36 +399,45 @@ def operator_payload():
 # ==========================================================
 
 def users_payload():
+    """Construit la liste des utilisateurs pour l'administration."""
 
-    out = []
+    output = []
 
-    users = get_user_model().objects.select_related(
-        "profile__household"
-    ).order_by("username")
+    users = (
+        get_user_model().objects
+        .select_related("profile__household")
+        .order_by("username")
+    )
 
-    for u in users:
+    for user in users:
 
-        p = getattr(u, "profile", None)
+        profile = getattr(user, "profile", None)
 
-        out.append({
-            "id": u.id,
-            "email": u.email or u.username,
-            "name": u.first_name,
+        output.append({
+            "id": user.id,
+            "email": user.email or user.username,
+            "name": user.first_name,
 
             "role": (
-                p.role if p
-                else ("admin" if u.is_superuser else "")
+                profile.role
+                if profile
+                else (
+                    "admin"
+                    if user.is_superuser
+                    else ""
+                )
             ),
 
             "household": (
-                p.household.code
-                if p and p.household else ""
+                profile.household.code
+                if profile and profile.household
+                else ""
             ),
 
-            "active": u.is_active,
+            "active": user.is_active,
         })
 
-    return out
+    return output
 
 
 # ==========================================================
@@ -280,11 +445,14 @@ def users_payload():
 # ==========================================================
 
 def quality_payload():
+    """Calcule les indicateurs de qualité des prévisions J+1."""
 
     rows = list(
         Forecast.objects.filter(
             horizon=1,
-            actual__isnull=False
+            actual__isnull=False,
+            actual__gt=0,
+            predicted__isnull=False,
         ).values(
             "household_id",
             "household__region__name",
@@ -297,124 +465,190 @@ def quality_payload():
     )
 
     if not rows:
-        return {"n": 0}
+        return {
+            "n": 0,
+            "mape": None,
+            "base": None,
+            "mae": None,
+            "coverage": None,
+            "by_region": [],
+            "by_day": [],
+        }
 
     past = {
-        (r["household_id"], r["date"]): r["kwh"]
-        for r in DailyConsumption.objects.values(
-            "household_id", "date", "kwh"
+        (row["household_id"], row["date"]): as_float(row["kwh"])
+        for row in DailyConsumption.objects.filter(
+            kwh__isnull=False
+        ).values(
+            "household_id",
+            "date",
+            "kwh",
         )
     }
 
-    def agg(rs):
+    def aggregate_metrics(records):
 
-        ok = [
-            r for r in rs
-            if r["actual"] is not None and r["actual"] > 0
+        valid = [
+            row for row in records
+            if (
+                row["actual"] is not None
+                and row["actual"] > 0
+                and row["predicted"] is not None
+            )
         ]
 
-        if not ok:
+        if not valid:
             return None
 
         mape = (
             sum(
-                abs(r["actual"] - r["predicted"]) / r["actual"]
-                for r in ok
-            ) / len(ok) * 100
+                abs(
+                    float(row["actual"])
+                    - float(row["predicted"])
+                ) / float(row["actual"])
+                for row in valid
+            )
+            / len(valid)
+            * 100
         )
 
-        base = [
-            abs(
-                r["actual"] -
-                past[(
-                    r["household_id"],
-                    r["date"] - timedelta(days=7)
-                )]
-            ) / r["actual"]
+        baseline_errors = []
 
-            for r in ok
+        for row in valid:
 
-            if (
-                r["household_id"],
-                r["date"] - timedelta(days=7)
-            ) in past
-        ]
+            previous_key = (
+                row["household_id"],
+                row["date"] - timedelta(days=7),
+            )
+
+            previous_value = past.get(previous_key)
+
+            if previous_value is not None:
+
+                baseline_errors.append(
+                    abs(
+                        float(row["actual"])
+                        - previous_value
+                    ) / float(row["actual"])
+                )
+
+        mae = (
+            sum(
+                abs(
+                    float(row["actual"])
+                    - float(row["predicted"])
+                )
+                for row in valid
+            )
+            / len(valid)
+        )
 
         return {
-            "n": len(ok),
+            "n": len(valid),
             "mape": round(mape, 2),
 
             "base": (
-                round(sum(base) / len(base) * 100, 2)
-                if base else None
+                round(
+                    sum(baseline_errors)
+                    / len(baseline_errors)
+                    * 100,
+                    2,
+                )
+                if baseline_errors
+                else None
             ),
 
-            "mae": round(
-                sum(
-                    abs(r["actual"] - r["predicted"])
-                    for r in ok
-                ) / len(ok),
-                3
-            ),
+            "mae": round(mae, 3),
         }
 
-    tot = agg(rows)
+    total = aggregate_metrics(rows)
 
-    iv = [
-        r for r in rows
-        if r["low"] is not None and r["high"] is not None
+    if total is None:
+        return {
+            "n": 0,
+            "mape": None,
+            "base": None,
+            "mae": None,
+            "coverage": None,
+            "by_region": [],
+            "by_day": [],
+        }
+
+    # Couverture des intervalles de prévision.
+    interval_rows = [
+        row for row in rows
+        if (
+            row["low"] is not None
+            and row["high"] is not None
+        )
     ]
 
-    tot["coverage"] = (
+    total["coverage"] = (
         round(
             sum(
-                r["low"] <= r["actual"] <= r["high"]
-                for r in iv
-            ) / len(iv) * 100,
-            1
+                float(row["low"])
+                <= float(row["actual"])
+                <= float(row["high"])
+                for row in interval_rows
+            )
+            / len(interval_rows)
+            * 100,
+            1,
         )
-        if iv else None
+        if interval_rows
+        else None
     )
 
-    by_reg = []
+    # Qualité par région.
+    by_region = []
 
-    for reg in REGIONS:
+    for region in REGIONS:
 
-        a = agg([
-            r for r in rows
+        region_metrics = aggregate_metrics([
+            row for row in rows
             if (
-                region_of(r["household__region__name"]) or {}
-            ).get("id") == reg["id"]
+                region_of(
+                    row["household__region__name"] or ""
+                ) or {}
+            ).get("id") == region["id"]
         ])
 
-        if a:
-            by_reg.append({
-                "id": reg["id"],
-                "fr": reg["fr"],
-                "ar": reg["ar"],
-                **a,
+        if region_metrics:
+
+            by_region.append({
+                "id": region["id"],
+                "fr": region["fr"],
+                "ar": region["ar"],
+                **region_metrics,
             })
 
+    # Qualité par jour.
     days = sorted({
-        r["date"] for r in rows
+        row["date"]
+        for row in rows
     })[-30:]
 
-    by_day = [
-        {
-            "date": d.isoformat(),
+    by_day = []
+
+    for day in days:
+
+        day_metrics = aggregate_metrics([
+            row for row in rows
+            if row["date"] == day
+        ])
+
+        by_day.append({
+            "date": day.isoformat(),
             "mape": (
-                agg([
-                    r for r in rows
-                    if r["date"] == d
-                ]) or {}
-            ).get("mape"),
-        }
-        for d in days
-    ]
+                day_metrics["mape"]
+                if day_metrics
+                else None
+            ),
+        })
 
     return {
-        **tot,
-        "by_region": by_reg,
+        **total,
+        "by_region": by_region,
         "by_day": by_day,
     }
 
@@ -424,21 +658,30 @@ def quality_payload():
 # ==========================================================
 
 def datasets_payload():
+    """Construit les informations sur les jeux de données importés."""
 
-    def span(qs, field):
+    def date_span(queryset, field):
 
-        a = qs.aggregate(
+        values = queryset.aggregate(
             a=Min(field),
-            b=Max(field)
+            b=Max(field),
         )
 
         return [
-            a["a"].isoformat() if a["a"] else None,
-            a["b"].isoformat() if a["b"] else None,
+            values["a"].isoformat()
+            if values["a"] else None,
+
+            values["b"].isoformat()
+            if values["b"] else None,
         ]
 
-    f1 = Forecast.objects.filter(horizon=1)
-    f7 = Forecast.objects.filter(horizon=7)
+    forecast_j1 = Forecast.objects.filter(
+        horizon=1
+    )
+
+    forecast_j7 = Forecast.objects.filter(
+        horizon=7
+    )
 
     return [
         {
@@ -447,39 +690,46 @@ def datasets_payload():
             "span": [None, None],
             "src": "generate_synthetic.py (seed 42)",
         },
-
         {
             "name": "daily.csv",
             "rows": DailyConsumption.objects.count(),
-            "span": span(DailyConsumption.objects, "date"),
+            "span": date_span(
+                DailyConsumption.objects,
+                "date",
+            ),
             "src": "prepare.py",
         },
-
         {
             "name": "forecast_h1_predictions.csv",
-            "rows": f1.count(),
-            "span": span(f1, "date"),
+            "rows": forecast_j1.count(),
+            "span": date_span(
+                forecast_j1,
+                "date",
+            ),
             "src": "train_forecast.py --horizon 1",
         },
-
         {
             "name": "forecast_h7_predictions.csv",
-            "rows": f7.count(),
-            "span": span(f7, "date"),
+            "rows": forecast_j7.count(),
+            "span": date_span(
+                forecast_j7,
+                "date",
+            ),
             "src": "train_forecast.py --horizon 7",
         },
-
         {
             "name": "profiles.csv",
             "rows": Profile.objects.count(),
             "span": [None, None],
             "src": "profiles.py",
         },
-
         {
             "name": "anomalies_flagged.csv",
             "rows": Alert.objects.count(),
-            "span": span(Alert.objects, "date"),
+            "span": date_span(
+                Alert.objects,
+                "date",
+            ),
             "src": "anomalies.py",
         },
     ]
@@ -490,13 +740,15 @@ def datasets_payload():
 # ==========================================================
 
 def admin_payload():
+    """Construit les données affichées dans l'espace administrateur."""
 
     return {
         "users": users_payload(),
 
         "households": list(
             Household.objects.order_by("code").values_list(
-                "code", flat=True
+                "code",
+                flat=True,
             )
         ),
 
