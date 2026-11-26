@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_profiles' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_profiles' %}</h1><p>{% t 'profiles_p' %}</p></div><span class="datastamp" id="qual"></span></div>
+<div class="grid g3" id="cards"></div>
+<div class="grid g2 mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'profiles_by_region' %}</h2><p>{% t 'profiles_by_region_p' %}</p></div></div>
+    <div class="chart"><canvas id="c-reg" role="img" aria-label="{% t 'profiles_by_region' %}"></canvas></div>
+    <div class="legend" id="lg-reg"></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'typical_by_profile' %}</h2><p>{% t 'typical_by_profile_p' %}</p></div></div>
+    <div class="chart"><canvas id="c-day" role="img" aria-label="{% t 'typical_by_profile' %}"></canvas></div>
+    <div class="legend" id="lg-day"></div>
+  </section>
+</div>
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'profile_table' %}</h2><p>{% t 'profile_table_p' %}</p></div></div>
+  <div class="table-wrap"><table class="t" id="tbl"></table></div>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"pr" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('pr'), {t, num, $, esc} = EN, C = D.clusters, L = EN.lang;
+const sil = D.silhouette ? Math.max(...Object.values(D.silhouette)) : null;
+$('#qual').textContent = t('kmeans_q', {k: C.length, s: num(sil, 2), a: num(D.ari, 2)});
+$('#cards').innerHTML = C.map((c, i) => `<section class="panel" style="border-top:4px solid ${EN.series(i)}">
+  <p class="small mute" style="margin:0">${t('cluster_n', {n: c.cluster + 1})} · ${c.n} ${t('households')}</p>
+  <h2 style="margin:4px 0 12px">${esc(c.name)}</h2>
+  <dl class="kv"><dt>${t('f_mean_day')}</dt><dd class="num">${num(c.features.mean_day)} kWh</dd><dt>${t('f_evening')}</dt><dd class="num">${num(c.features.evening_share, 0)} %</dd>
+  <dt>${t('f_night')}</dt><dd class="num">${num(c.features.night_share, 0)} %</dd><dt>${t('f_heat')}</dt><dd class="num">${num(c.features.heat_sens, 2)} kWh/°C</dd>
+  <dt>${t('alerts_per_hh')}</dt><dd class="num">${num(c.alerts_per_household, 1)}</dd></dl></section>`).join('');
+function draw() {
+  const ds = C.map((c, i) => ({label: c.name, data: D.regions.map(r => c.regions[r.id] || 0), backgroundColor: EN.series(i), borderColor: EN.css('--surface'), borderWidth: 2, borderSkipped: false}));
+  EN.chart('c-reg', {type: 'bar', data: {labels: D.regions.map(r => r[L]), datasets: ds},
+    options: {scales: {x: {stacked: true, grid: {display: false}}, y: {stacked: true, beginAtZero: true, ticks: {precision: 0}, title: {display: true, text: t('households')}}},
+      plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${x.raw}`}}}}});
+  $('#lg-reg').innerHTML = ds.map(d => `<span><i style="background:${d.backgroundColor}"></i>${esc(d.label)}</span>`).join('');
+  const dd = C.map((c, i) => ({label: c.name, data: c.hourly, borderColor: EN.series(i), tension: .35}));
+  EN.chart('c-day', {type: 'line', data: {labels: [...Array(24).keys()].map(h => h + 'h'), datasets: dd},
+    options: {scales: {y: {beginAtZero: true, title: {display: true, text: 'kWh / h'}}}, plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${num(x.raw, 2)} kWh`}}}}});
+  $('#lg-day').innerHTML = dd.map(d => `<span><i class="line" style="background:${d.borderColor}"></i>${esc(d.label)}</span>`).join('');
+}
+draw(); document.addEventListener('themechange', draw);
+const F = [['mean_day', 'f_mean_day', 1], ['evening_share', 'f_evening', 0], ['night_share', 'f_night', 0], ['summer_ratio', 'f_summer', 1], ['load_factor', 'f_load', 2], ['heat_sens', 'f_heat', 2], ['weekend_ratio', 'f_weekend', 2]];
+$('#tbl').innerHTML = `<thead><tr><th>${t('feature')}</th>${C.map((c, i) => `<th class="n"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${EN.series(i)};margin-inline-end:6px"></i>${t('cluster_n', {n: c.cluster + 1})}</th>`).join('')}</tr></thead>
+ <tbody>${F.map(([k, lab, d]) => `<tr><td>${t(lab)}</td>${C.map(c => `<td class="n num">${num(c.features[k], d)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+})();
+</script>
+{% endblock %}

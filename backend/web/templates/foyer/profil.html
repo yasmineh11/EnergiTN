@@ -1,0 +1,93 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_profile' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_profile' %}</h1><p>{% t 'profile_p' %}</p></div></div>
+
+<div class="grid g-main">
+  <section class="panel">
+    <div class="panel-head"><div><p class="small" style="margin:0">{% t 'your_profile' %}</p><h2 id="pname" style="font-size:1.35rem;margin-top:2px"></h2></div><span class="badge b-low" id="pcl"></span></div>
+    <p id="pdesc" class="mute"></p>
+    <div id="gauges" style="display:grid;gap:16px;margin-top:16px"></div>
+    <div class="legend"><span><i style="background:var(--bleu)"></i>{% t 'you' %}</span><span><i style="background:var(--soleil);width:4px"></i>{% t 'peers_avg' %}</span></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'typical_day' %}</h2><p>{% t 'typical_p' %}</p></div></div>
+    <div class="chart"><canvas id="c-day" role="img" aria-label="{% t 'typical_day' %}"></canvas></div>
+    <div class="legend" id="day-legend"></div>
+  </section>
+</div>
+
+<section class="panel mt" id="alertes">
+  <div class="panel-head"><div><h2>{% t 'my_alerts' %}</h2><p>{% t 'alerts_p' %}</p></div>
+    <div class="seg" role="group" id="filt"><button type="button" data-f="open" aria-pressed="true">{% t 'open' %}</button><button type="button" data-f="all">{% t 'all' %}</button></div></div>
+  <div id="alerts"></div>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"pf" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('pf'), {t, num, date, $, esc} = EN, F = D.facts, P = F.profile, PE = F.peers;
+if (P) {
+  $('#pname').textContent = P.name; $('#pcl').textContent = t('cluster_n', {n: P.cluster + 1});
+  $('#pdesc').textContent = t('profile_desc', {e: num(P.evening_share, 0), n: num(P.night_share, 0), h: num(P.heat_sens, 2)});
+  const G = [['mean_day', 'f_mean_day', 'kWh', 1, 30], ['evening_share', 'f_evening', '%', 0, 60], ['night_share', 'f_night', '%', 0, 30],
+             ['heat_sens', 'f_heat', 'kWh/°C', 2, 3], ['summer_ratio', 'f_summer', '×', 1, 5], ['weekend_ratio', 'f_weekend', '×', 2, 1.5]];
+  $('#gauges').innerHTML = G.map(([k, lab, u, d, mx]) => {
+    const v = P[k], pv = PE ? PE[k] : null, pct = Math.min(100, (v || 0) / mx * 100), pp = pv != null ? Math.min(100, pv / mx * 100) : null;
+    return `<div class="gauge"><div class="g-top"><span>${t(lab)}</span><b class="num">${num(v, d)} ${u}</b></div>
+      <div class="g-track"><span class="g-fill" style="width:${pct}%"></span>${pp != null ? `<span class="g-peer" style="inset-inline-start:${pp}%" title="${t('peers_avg')} : ${num(pv, d)}"></span>` : ''}</div>
+      ${pv != null ? `<span class="tiny mute">${t('peers_avg')} : ${num(pv, d)} ${u}</span>` : ''}</div>`;
+  }).join('');
+} else {
+  // nouveau foyer (non issu de l'étude) : pas de groupe K-Means -> explication au lieu de jauges vides
+  $('#pname').textContent = t('no_profile');
+  $('#pcl').style.display = 'none';
+  $('#pdesc').innerHTML = `<span class="notice info"><svg class="i"><use href="#i-info"/></svg><span>${t('no_profile_why')}</span></span>`;
+  document.querySelector('#gauges + .legend').style.display = 'none';
+}
+
+function day() {
+  const H = D.hourly || {}, c = EN.css, ds = [];
+  if (!H.summer && !H.winter && !H.all) {   // relevés journaliers seulement : pas de forme horaire à montrer
+    const box = document.getElementById('c-day').closest('.chart');
+    box.outerHTML = `<div class="notice info"><svg class="i"><use href="#i-info"/></svg><span>${t('no_hourly_why')}</span></div>`;
+    $('#day-legend').style.display = 'none';
+    return;
+  }
+  if (H.summer) ds.push({label: t('summer'), data: H.summer, borderColor: c('--s2'), tension: .35});
+  if (H.winter) ds.push({label: t('winter'), data: H.winter, borderColor: c('--s1'), tension: .35});
+  if (H.all) ds.push({label: t('year_avg'), data: H.all, borderColor: c('--mute'), borderDash: [4, 4], tension: .35});
+  EN.chart('c-day', {type: 'line', data: {labels: [...Array(24).keys()].map(h => h + 'h'), datasets: ds},
+    options: {scales: {y: {beginAtZero: true, title: {display: true, text: 'kWh / h'}}}, plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${num(x.raw, 2)} kWh`}}}}});
+  $('#day-legend').innerHTML = ds.map(d => `<span><i class="line" style="background:${d.borderColor}"></i>${d.label}</span>`).join('');
+}
+day();
+document.addEventListener('themechange', day);
+
+let filt = 'open';
+function alerts() {
+  const A = D.alerts.filter(a => filt === 'all' || !a.resolved);
+  document.querySelectorAll('#filt button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === filt));
+  $('#alerts').innerHTML = A.length ? A.map(a => `<div class="alert-item${a.resolved ? ' resolved' : ''}">
+    <span class="sev ${a.severity}"><svg class="i"><use href="#i-${a.type === 'consommation_nocturne' ? 'moon' : 'alert'}"/></svg></span>
+    <div><h3>${t('atype_' + a.type)} · ${date(a.date, {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'})}</h3>
+      <p>${a.kwh && a.expected ? t('alert_vals', {k: num(a.kwh), e: num(a.expected)}) + (a.ratio ? ` (×${num(a.ratio, 2)})` : '') : ''}${a.type === 'consommation_nocturne' && a.night_ratio ? t('night_vals', {r: num(a.night_ratio, 1)}) : ''}</p>
+      <p class="tiny mute">${t(a.source === 'live' ? 'detected_live' : 'detected_ml')}</p>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="/foyer/assistant/?q=${encodeURIComponent(t('explain_alert_of', {d: date(a.date, {day: 'numeric', month: 'long'})}))}"><svg class="i"><use href="#i-chat"/></svg>${t('ask_assistant')}</a>
+        ${a.resolved ? '' : `<button class="btn btn-sm btn-ghost" data-resolve="${a.id}"><svg class="i"><use href="#i-check"/></svg>${t('mark_resolved')}</button>`}
+      </div></div>${EN.sevBadge(a.severity)}</div>`).join('')
+    : `<div class="empty"><svg class="i"><use href="#i-shield"/></svg><p>${t('no_alerts')}</p></div>`;
+}
+alerts();
+document.getElementById('filt').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { filt = b.dataset.f; alerts(); } });
+document.getElementById('alerts').addEventListener('click', async e => {
+  const b = e.target.closest('[data-resolve]'); if (!b) return;
+  b.disabled = true;
+  const r = await EN.post('/foyer/alertes/resoudre/', {id: +b.dataset.resolve});
+  if (r.ok) { D.alerts.find(a => a.id === +b.dataset.resolve).resolved = true; alerts(); EN.toast(t('resolved_ok')); } else { EN.toast(t(r.error || 'e_server'), true); b.disabled = false; }
+});
+})();
+</script>
+{% endblock %}

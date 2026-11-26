@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% if mode == 'register' %}{% t 'create_account' %}{% else %}{% t 'login' %}{% endif %}{% endblock %}
+{% block shell %}
+<div class="auth">
+  <section class="auth-art" aria-hidden="false">
+    <svg class="pattern" width="100%" height="100%" aria-hidden="true"><defs><pattern id="khatam" width="64" height="64" patternUnits="userSpaceOnUse"><g fill="none" stroke="#fff" stroke-width="1.2"><rect x="18" y="18" width="28" height="28"/><rect x="18" y="18" width="28" height="28" transform="rotate(45 32 32)"/><circle cx="32" cy="32" r="4"/><path d="M0 0l18 18M64 0 46 18M0 64l18-18M64 64 46 46"/></g></pattern></defs><rect width="100%" height="100%" fill="url(#khatam)"/></svg>
+    <a class="brand" href="/" style="color:#fff"><svg><use href="#logo"/></svg><span><b>ÉnergiTN</b><small style="color:rgba(255,255,255,.7)">{% t 'tagline_short' %}</small></span></a>
+    <div>
+      <h1>{% if mode == 'register' %}{% t 'auth_reg_h' %}{% else %}{% t 'auth_h' %}{% endif %}</h1>
+      <p style="margin-top:14px">{% t 'auth_p' %}</p>
+    </div>
+    <div class="auth-map">
+      {% include "partials/tn_map.html" with tone="dark" %}
+    </div>
+    <p class="small art-foot" style="color:rgba(255,255,255,.65);margin:0">{% t 'proto_short' %}</p>
+  </section>
+
+  <section class="auth-form">
+    <div class="auth-card">
+      <div class="auth-top">
+        <a class="btn btn-sm btn-ghost" href="/">{% t 'home' %}</a>
+        <a class="btn btn-sm" href="/langue/{% if lang == 'ar' %}fr{% else %}ar{% endif %}/?next={{ request.path }}" lang="{% if lang == 'ar' %}fr{% else %}ar{% endif %}">{% if lang == 'ar' %}Français{% else %}العربية{% endif %}</a>
+      </div>
+
+      {% if mode == 'register' %}
+      <h2>{% t 'create_account' %}</h2>
+      <p class="lead">{% t 'reg_lead' %}</p>
+      <div class="wizard-steps" aria-hidden="true"><span class="on" id="ws1"></span><span id="ws2"></span></div>
+      <form method="post" id="reg" novalidate>{% csrf_token %}
+        <div id="step1" class="stack" style="display:grid;gap:16px">
+          <label class="field"><span>{% t 'full_name' %}</span><input class="input" name="name" autocomplete="name" value="{{ form.name }}" required></label>
+          <label class="field"><span>{% t 'email' %}</span><input class="input" name="username" type="email" dir="ltr" autocomplete="email" value="{{ form.username }}" required></label>
+          <label class="field"><span>{% t 'password' %}</span>
+            <span class="pw"><input class="input" id="pw" name="password" type="password" dir="ltr" autocomplete="new-password" required minlength="8"><button type="button" data-pw="pw" aria-label="{% t 'show_pw' %}"><svg class="i"><use href="#i-eye"/></svg></button></span>
+            <span class="strength"><i id="pw-meter"></i></span><small id="pw-hint">{% t 'pw_rules' %}</small></label>
+          <label class="field"><span>{% t 'password2' %}</span><input class="input" id="pw2" name="password2" type="password" dir="ltr" autocomplete="new-password" required></label>
+          <button class="btn btn-primary" type="button" id="next">{% t 'continue' %}</button>
+        </div>
+        <div id="step2" hidden style="display:grid;gap:16px">
+          <div class="field"><span>{% t 'reg_mode' %}</span>
+            <div class="choice">
+              <label><input type="radio" name="mode" value="demo" {% if form.mode != 'own' %}checked{% endif %}><span>{% t 'reg_demo' %}<small>{% t 'reg_demo_p' %}</small></span></label>
+              <label><input type="radio" name="mode" value="own" {% if form.mode == 'own' %}checked{% endif %}><span>{% t 'reg_own' %}<small>{% t 'reg_own_p' %}</small></span></label>
+            </div></div>
+          <label class="field"><span>{% t 'region' %}</span>
+            <select class="input" name="region">{% for r in regions %}<option value="{{ r.id }}" {% if form.region == r.id %}selected{% endif %}>{% if lang == 'ar' %}{{ r.ar }}{% else %}{{ r.fr }}{% endif %}</option>{% endfor %}</select></label>
+          <div id="own-fields" style="display:grid;gap:16px">
+            <label class="field"><span>{% t 'household_type' %}</span>
+              <select class="input" name="persona">{% for k, v in personas %}<option value="{{ k }}" {% if form.persona == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+            <label class="field"><span>{% t 'ac_level' %}</span>
+              <select class="input" name="ac"><option value="0.7">{% t 'ac_low' %}</option><option value="1.0" selected>{% t 'ac_mid' %}</option><option value="1.3">{% t 'ac_high' %}</option></select></label>
+          </div>
+          <label class="check small"><input type="checkbox" name="consent" required {% if form.consent %}checked{% endif %}>{% t 'consent' %}</label>
+          <div style="display:flex;gap:8px"><button class="btn" type="button" id="back">{% t 'back' %}</button><button class="btn btn-primary" type="submit" style="flex:1">{% t 'create_my_account' %}</button></div>
+        </div>
+        <div class="err-box" role="alert" id="err">{% if error %}{% t error %}{% endif %}{% for e in pw_errors %} {{ e }}{% endfor %}</div>
+      </form>
+      <p class="small" style="margin-top:18px">{% t 'have_account' %} <a href="/login/">{% t 'login' %}</a></p>
+
+      {% else %}
+      <h2>{% t 'login' %}</h2>
+      <p class="lead">{% t 'login_lead' %}</p>
+      <form method="post" id="f">{% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="field"><span>{% t 'email' %}</span><input class="input" id="em" name="username" type="email" dir="ltr" autocomplete="username" value="{{ email }}" required autofocus></label>
+        <label class="field"><span>{% t 'password' %}</span>
+          <span class="pw"><input class="input" id="pw" name="password" type="password" dir="ltr" autocomplete="current-password" required><button type="button" data-pw="pw" aria-label="{% t 'show_pw' %}"><svg class="i"><use href="#i-eye"/></svg></button></span></label>
+        <div class="err-box" role="alert">{% if error %}{% t error %}{% endif %}{% for m in messages %}{{ m }}{% endfor %}</div>
+        <button class="btn btn-primary" type="submit">{% t 'login' %}</button>
+      </form>
+      <p class="small" style="margin-top:16px">{% t 'no_account' %} <a href="/register/">{% t 'create_account' %}</a></p>
+      {% if demo_password %}<div class="demo" id="demo">
+        <b class="small">{% t 'demo_h' %}</b>
+        <div class="demo-list">
+          <button type="button" data-demo="foyer@demo.tn"><span class="avatar">F</span><span><b>{% t 'role_foyer' %}</b><span>{% t 'demo_foyer' %}</span></span></button>
+          <button type="button" data-demo="analyste@demo.tn"><span class="avatar" style="background:var(--s3)">A</span><span><b>{% t 'role_analyste' %}</b><span>{% t 'demo_analyste' %}</span></span></button>
+          <button type="button" data-demo="admin@demo.tn"><span class="avatar" style="background:var(--s2)">G</span><span><b>{% t 'role_admin' %}</b><span>{% t 'demo_admin' %}</span></span></button>
+        </div>
+      </div>{% endif %}
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block data %}{{ demo_password|json_script:"demo-pw" }}{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-demo]').forEach(b => b.addEventListener('click', () => {
+  document.getElementById('em').value = b.dataset.demo;
+  document.getElementById('pw').value = EN.data('demo-pw');
+  document.getElementById('f').submit();
+}));
+const reg = document.getElementById('reg');
+if (reg) {
+  const s1 = document.getElementById('step1'), s2 = document.getElementById('step2'), err = document.getElementById('err');
+  const pw = document.getElementById('pw'), meter = document.getElementById('pw-meter');
+  const score = v => [v.length >= 8, /[A-Z]/.test(v) && /[a-z]/.test(v), /\d/.test(v), /[^A-Za-z0-9]/.test(v), v.length >= 12].filter(Boolean).length;
+  pw.addEventListener('input', () => { const s = score(pw.value); meter.style.width = (s * 20) + '%'; meter.style.background = s >= 4 ? 'var(--olive)' : s >= 3 ? 'var(--soleil)' : 'var(--harissa)'; });
+  const show = n => { s1.hidden = n !== 1; s2.hidden = n !== 2; s1.style.display = n === 1 ? 'grid' : 'none'; s2.style.display = n === 2 ? 'grid' : 'none';
+    document.getElementById('ws2').classList.toggle('on', n === 2); };
+  document.getElementById('next').onclick = () => {
+    const f = reg.elements; let e = '';
+    if (!f.name.value.trim()) e = 'e_name';
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.username.value.trim())) e = 'e_mail';
+    else if (f.password.value.length < 8) e = 'e_pw';
+    else if (f.password.value !== f.password2.value) e = 'e_match';
+    err.textContent = e ? EN.t(e) : '';
+    for (const [k, bad] of [['name', e === 'e_name'], ['username', e === 'e_mail'], ['password', e === 'e_pw'], ['password2', e === 'e_match']]) f[k].setAttribute('aria-invalid', bad);
+    if (!e) show(2);
+  };
+  document.getElementById('back').onclick = () => show(1);
+  const own = document.getElementById('own-fields');
+  const sync = () => own.style.display = reg.elements.mode.value === 'own' ? 'grid' : 'none';
+  reg.querySelectorAll('[name=mode]').forEach(r => r.addEventListener('change', sync)); sync();
+  {% if error or pw_errors %}{% if step == 2 %}show(2);{% endif %}{% endif %}
+}
+</script>
+{% endblock %}

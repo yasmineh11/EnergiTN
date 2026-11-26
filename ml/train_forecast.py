@@ -54,10 +54,12 @@ def apply_linear_base(x, coefs, default):
     return c[:, 0] + c[:, 1] * x.cdd.values + c[:, 2] * x.is_weekend.values
 
 def metrics(y, p):
-    y, p = np.asarray(y), np.asarray(p)
+    y, p = np.asarray(y, float), np.asarray(p, float)
     return {"MAE": round(float(np.mean(np.abs(y - p))), 3),
             "RMSE": round(float(np.sqrt(np.mean((y - p) ** 2))), 3),
-            "sMAPE_%": round(float(np.mean(2 * np.abs(y - p) / (np.abs(y) + np.abs(p) + 1e-9)) * 100), 2)}
+            "sMAPE_%": round(float(np.mean(2 * np.abs(y - p) / (np.abs(y) + np.abs(p) + 1e-9)) * 100), 2),
+            # ajout pour Django (affichage de l'erreur en %) : MAPE sur les jours où la consommation est > 0
+            "MAPE_%": round(float(np.mean(np.abs(y[y > 0] - p[y > 0]) / y[y > 0]) * 100), 2)}
 
 def main():
     ap = argparse.ArgumentParser()
@@ -142,9 +144,19 @@ def main():
         outs.append(x[["household_id", "date", "kwh_day", "anomaly_day", "split"]].assign(pred=e, q10=l, q90=h))
     pd.concat(outs).to_csv(PROC / f"forecast_h{H}_predictions.csv", index=False)
     joblib.dump({"H": H, "features": feats, "models": m2, "weights": weights, "hybrid": HYB, "interval_margin": margin,
-                 "trained_until": VAL_END}, MODELS / f"forecast_h{H}.joblib")
-    json.dump({"horizon": H, "hybrid": HYB, "weather_error_c": a.weather_error, "test": res, "interval_coverage": cover,
-               "weights": {k: float(v) for k, v in weights.items()}, "interval_margin": margin}, open(MODELS / f"forecast_h{H}_metrics.json", "w"), indent=1)
+                 "trained_until": VAL_END, "interval_margin_kind": "scale_max1",
+                 "weather_error_c": a.weather_error}, MODELS / f"forecast_h{H}.joblib", compress=3)
+    # ajouts pour Django : version de scikit-learn (contrôle de compatibilité), date d'entraînement, gain vs baseline
+    import sklearn
+    from datetime import datetime
+    gain = round((1 - res["ensemble"]["MAE"] / res["baseline (même jour sem. dernière)"]["MAE"]) * 100, 1)
+    with open(MODELS / f"forecast_h{H}_metrics.json", "w", encoding="utf-8") as fh:
+        json.dump({"horizon": H, "hybrid": HYB, "weather_error_c": a.weather_error, "test": res, "interval_coverage": cover,
+                   "coverage_target": 0.8, "gain_mae_vs_baseline_%": gain,
+                   "weights": {k: float(v) for k, v in weights.items()}, "interval_margin": margin,
+                   "n_train": int(len(tr) + len(va)), "n_test": int(len(tn)), "train_end": TRAIN_END, "val_end": VAL_END,
+                   "trained_at": datetime.now().isoformat(timespec="seconds"), "sklearn": sklearn.__version__},
+                  fh, ensure_ascii=False, indent=1)
     print(f"-> models/forecast_h{H}.joblib")
 
 if __name__ == "__main__":

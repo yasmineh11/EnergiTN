@@ -1,0 +1,69 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_anomalies' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_anomalies' %}</h1><p>{% t 'anomalies_p' %}</p></div><span class="datastamp" id="qual"></span></div>
+<section class="metrics" id="kp"></section>
+<div class="grid g-main mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'anom_by_region' %}</h2><p>{% t 'anom_by_region_p' %}</p></div></div>
+    <div class="chart"><canvas id="c-reg" role="img" aria-label="{% t 'anom_by_region' %}"></canvas></div>
+    <div class="legend" id="lg-reg"></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'watchlist' %}</h2><p>{% t 'watchlist_p' %}</p></div></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'household' %}</th><th>{% t 'region' %}</th><th class="n">{% t 'alerts' %}</th><th>{% t 'last' %}</th></tr></thead><tbody id="watch"></tbody></table></div>
+  </section>
+</div>
+<div class="grid g2 mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'outages_h' %}</h2><p>{% t 'outages_p' %}</p></div></div>
+    <div class="chart sm"><canvas id="c-out" role="img" aria-label="{% t 'outages_h' %}"></canvas></div>
+    <div class="chart sm" style="margin-top:8px"><canvas id="c-tmp" role="img" aria-label="{% t 'avg_tmax' %}"></canvas></div>
+    <p class="small mute" id="out-note" style="margin-top:8px"></p>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'outages_by_region' %}</h2></div></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th>{% t 'region' %}</th><th class="n">{% t 'outages' %}</th><th class="n">{% t 'hours' %}</th><th class="n">{% t 'on_hot_days' %}</th><th class="n">{% t 'anom_per_hh' %}</th></tr></thead><tbody id="regs"></tbody></table></div>
+  </section>
+</div>
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'detector_quality' %}</h2><p>{% t 'detector_quality_p' %}</p></div></div>
+  <div class="table-wrap"><table class="t" id="det"></table></div>
+</section>
+{% endblock %}
+{% block data %}{{ data|json_script:"an" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('an'), {t, num, date, $, esc} = EN, L = EN.lang;
+const TY = ['surconsommation', 'consommation_nocturne', 'ecart_prevision'];
+const rname = id => (D.regions.find(r => r.id === id) || {})[L] || id;
+const top = [...D.regions].sort((a, b) => b.per_household - a.per_household)[0];
+$('#qual').textContent = D.metrics.retained ? t('retained', {d: D.metrics.retained}) : '';
+$('#kp').innerHTML = `<div class="metric"><div class="lab">${t('anomalies_total')}</div><div class="val num">${num(D.total, 0)}</div><div class="sub">${t('summer26')}</div></div>
+ <div class="metric"><div class="lab">${t('zone_watch')}</div><div class="val">${esc(top[L])}</div><div class="sub num">${num(top.per_household, 1)} ${t('per_hh')}</div></div>
+ <div class="metric"><div class="lab">${t('hh_watch')}</div><div class="val num">${D.watch.length}</div><div class="sub">${t('two_plus')}</div></div>
+ <div class="metric accent"><div class="lab">${t('outages_on_hot')}</div><div class="val num">${num(D.hot_share.outages_on_hot_share, 0)}<small>%</small></div><div class="sub">${t('hot_days_share', {p: num(D.hot_share.hot_days_share, 0)})}</div></div>`;
+$('#watch').innerHTML = D.watch.length ? D.watch.map(w => `<tr><td><b>${w.household}</b><br><span class="tiny mute">${esc(w.profile)}</span></td><td>${esc(rname(w.region))}</td>
+  <td class="n"><b class="num">${w.n}</b>${w.high ? ` <span class="badge b-high">${w.high} ${t('sev_haute').toLowerCase()}</span>` : ''}</td><td class="num">${date(w.last)}</td></tr>`).join('') : `<tr><td colspan="4" class="empty">${t('none')}</td></tr>`;
+$('#regs').innerHTML = D.regions.map(r => `<tr><td>${esc(r[L])}</td><td class="n num">${r.outages}</td><td class="n num">${r.outage_hours}</td><td class="n num">${r.outages ? num(r.outages_hot / r.outages * 100, 0) + ' %' : '–'}</td><td class="n num">${num(r.per_household, 1)}</td></tr>`).join('');
+$('#out-note').textContent = t('outages_note');
+const m = D.metrics.test || {};
+const keys = Object.keys(m);
+$('#det').innerHTML = keys.length ? `<thead><tr><th>${t('detector')}</th><th class="n">${t('precision')}</th><th class="n">${t('recall')}</th><th class="n">F1</th><th class="n">${t('true_pos')}</th><th class="n">${t('false_pos')}</th></tr></thead><tbody>` +
+  keys.map(k => `<tr${k === D.metrics.retained ? ' style="background:var(--bleu-soft)"' : ''}><td>${esc(k)}${k === D.metrics.retained ? ` <span class="badge b-low">${t('retained_short')}</span>` : ''}</td><td class="n num">${num(m[k].precision, 2)}</td><td class="n num">${num(m[k].rappel, 2)}</td><td class="n num">${num(m[k].F1, 2)}</td><td class="n num">${m[k].tp}</td><td class="n num">${m[k].fp}</td></tr>`).join('') + '</tbody>' : `<tr><td class="empty">${t('none')}</td></tr>`;
+function draw() {
+  const c = EN.css, ds = TY.map((ty, i) => ({label: t('atype_' + ty), data: D.regions.map(r => r.types[ty] || 0), backgroundColor: EN.series(i), borderColor: c('--surface'), borderWidth: 2, borderSkipped: false}));
+  EN.chart('c-reg', {type: 'bar', data: {labels: D.regions.map(r => r[L]), datasets: ds}, options: {scales: {x: {stacked: true, grid: {display: false}}, y: {stacked: true, beginAtZero: true, ticks: {precision: 0}}},
+    plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${x.raw}`}}}}});
+  $('#lg-reg').innerHTML = ds.map(d => `<span><i style="background:${d.backgroundColor}"></i>${d.label}</span>`).join('');
+  const lab = D.months.map(x => EN.month(x, {month: 'short', year: '2-digit'}));
+  EN.chart('c-out', {type: 'bar', data: {labels: lab, datasets: [{label: t('outages'), data: D.outages_month, backgroundColor: c('--s2'), maxBarThickness: 18}]},
+    options: {scales: {x: {grid: {display: false}, ticks: {maxRotation: 0, autoSkip: true}}, y: {beginAtZero: true, title: {display: true, text: t('outages')}}}}});
+  EN.chart('c-tmp', {type: 'line', data: {labels: lab, datasets: [{label: t('avg_tmax'), data: D.tmax_month, borderColor: c('--s4'), backgroundColor: c('--s4'), tension: .3, pointRadius: 2}]},
+    options: {scales: {x: {grid: {display: false}, ticks: {maxRotation: 0, autoSkip: true}}, y: {title: {display: true, text: '°C'}}}, plugins: {tooltip: {callbacks: {label: x => `${t('avg_tmax')} : ${num(x.raw, 1)} °C`}}}}});
+}
+draw(); document.addEventListener('themechange', draw);
+})();
+</script>
+{% endblock %}

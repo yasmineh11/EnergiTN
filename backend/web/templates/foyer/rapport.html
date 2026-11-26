@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_report' %}{% endblock %}
+{% block content %}
+<div class="ph no-print">
+  <div><h1>{% t 'nav_report' %}</h1><p>{% t 'report_p' %}</p></div>
+  <div class="ph-actions">
+    <form method="get"><label class="sr" for="m">{% t 'month' %}</label><select class="input" id="m" name="m" onchange="this.form.submit()">{% for m in months %}<option value="{{ m }}" {% if m == current %}selected{% endif %} data-ym="{{ m }}">{{ m }}</option>{% endfor %}</select></form>
+    <button class="btn" type="button" onclick="window.print()"><svg class="i"><use href="#i-print"/></svg>{% t 'print_pdf' %}</button>
+  </div>
+</div>
+{% if not report %}<div class="panel empty"><svg class="i"><use href="#i-report"/></svg><p>{% t 'no_report' %}</p></div>{% else %}
+<article class="panel report">
+  <header class="report-head">
+    <div><p class="small mute" style="margin:0">{% t 'report_of' %}</p><h2 style="font-size:1.6rem;margin:2px 0 0" id="rt"></h2><p class="small mute" id="rwho" style="margin:4px 0 0"></p></div>
+    <svg width="40" height="40" style="color:var(--ink)"><use href="#logo"/></svg>
+  </header>
+  <p id="summary" style="font-size:1.05rem"></p>
+  <div class="metrics" id="rm" style="margin:18px 0"></div>
+  <div class="chart sm"><canvas id="c-month" role="img" aria-label="{% t 'daily_kwh' %}"></canvas></div>
+  <div class="grid g2">
+    <div><h2>{% t 'highlights' %}</h2><ul class="facts" id="hl"></ul></div>
+    <div><h2>{% t 'recommendations' %}</h2><ul class="tip-list" id="tips"></ul></div>
+  </div>
+  <p class="tiny mute" style="margin-top:22px" id="disc"></p>
+</article>
+{% endif %}
+{% endblock %}
+{% block data %}{{ report|json_script:"rp" }}{{ facts_who|json_script:"rpw" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const {t, num, date, $, esc} = EN;
+document.querySelectorAll('#m option').forEach(o => o.textContent = EN.month(o.dataset.ym));
+const R = EN.data('rp'); if (!R) return;
+$('#rt').textContent = EN.month(R.month); $('#rwho').textContent = EN.data('rpw') + (R.complete ? '' : ' · ' + t('partial_month', {n: R.days}));
+$('#summary').textContent = R.summary;
+$('#rm').innerHTML = `<div class="metric"><div class="lab">${t('total')}</div><div class="val num">${num(R.total, 0)}<small>kWh</small></div></div>
+ <div class="metric"><div class="lab">${t('per_day')}</div><div class="val num">${num(R.avg)}<small>kWh</small></div></div>
+ <div class="metric"><div class="lab">${t('vs_prev_month')}</div><div class="val num">${R.trend_pct == null ? '–' : (R.trend_pct > 0 ? '+' : '') + num(R.trend_pct, 0) + ' %'}</div></div>
+ <div class="metric accent"><div class="lab">${t('est_bill')}</div><div class="val num">${num(R.bill.total, 0)}<small>DT</small></div></div>`;
+$('#hl').innerHTML = R.highlights.map(h => `<li>${esc(h)}</li>`).join('');
+$('#tips').innerHTML = R.tips.map(h => `<li><svg class="i"><use href="#i-leaf"/></svg><span>${esc(h)}</span></li>`).join('');
+$('#disc').textContent = R.disclaimer + ' ' + t('synthetic_note');
+const al = new Set(R.alerts.map(a => a.date));
+function draw() { const c = EN.css;
+  EN.chart('c-month', {type: 'bar', data: {labels: R.series.map(s => date(s.date, {day: 'numeric'})), datasets: [{data: R.series.map(s => s.kwh),
+    backgroundColor: R.series.map(s => al.has(s.date) ? c('--harissa') : s.date === R.peak.date ? c('--s4') : c('--s1')), maxBarThickness: 22}]},
+    options: {animation: false, scales: {x: {grid: {display: false}}, y: {beginAtZero: true, title: {display: true, text: 'kWh'}}},
+      plugins: {tooltip: {callbacks: {title: x => date(R.series[x[0].dataIndex].date, {weekday: 'long', day: 'numeric', month: 'long'}), label: x => `${num(x.raw)} kWh` + (R.series[x.dataIndex].tmax != null ? ` · ${num(R.series[x.dataIndex].tmax, 0)} °C` : '')}}}}});
+}
+draw(); document.addEventListener('themechange', draw);
+})();
+</script>
+{% endblock %}

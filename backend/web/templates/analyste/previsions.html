@@ -1,0 +1,135 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_regional' %}{% endblock %}
+{% block content %}
+{% if not data %}<div class="panel empty"><svg class="i"><use href="#i-map"/></svg><h2>{% t 'no_regional' %}</h2><p>{% t 'no_regional_p' %}</p></div>{% else %}
+<div class="ph">
+  <div><h1>{% t 'nav_regional' %}</h1><p>{% t 'regional_p' %}</p></div>
+  <span class="datastamp"><span class="dot"></span><span id="stamp"></span></span>
+</div>
+
+<section class="panel" style="padding:16px 20px">
+  <div class="form-row" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)">
+    <div class="field"><span>{% t 'forecast_day' %}</span><div class="seg" id="days" role="group" style="flex-wrap:wrap"></div></div>
+    <label class="field"><span>{% t 'heat_scenario' %} <b class="num" id="heat-v">+0 °C</b></span><input type="range" id="heat" min="0" max="8" value="0" step="1"></label>
+    <label class="field"><span>{% t 'hour' %} <b class="num" id="hour-v">20:00</b></span><input type="range" id="hour" min="0" max="23" value="20" step="1"></label>
+  </div>
+</section>
+
+<section class="metrics mt" id="kp"></section>
+
+<div class="grid g-main mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'load_ranking' %}</h2><p>{% t 'load_def' %}</p></div></div>
+    <div id="rank"></div>
+    <div class="legend"><span><i style="background:var(--olive)"></i>{% t 'st_ok' %} &lt; 80 %</span><span><i style="background:var(--soleil)"></i>{% t 'st_warn' %} 80–95 %</span><span><i style="background:var(--harissa)"></i>{% t 'st_crit' %} ≥ 95 %</span></div>
+    <div id="alerts" class="mt"></div>
+  </section>
+  <section class="panel map">
+    <div class="panel-head"><div><h2>{% t 'map_h' %}</h2><p>{% t 'map_p' %}</p></div></div>
+    <div id="map"></div>
+  </section>
+</div>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'heatmap_h' %}</h2><p>{% t 'heatmap_p' %}</p></div></div>
+  <div id="hm" style="overflow-x:auto"></div>
+</section>
+
+<div class="grid g2 mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'week_by_region' %}</h2><p>{% t 'kwh_per_hh' %}</p></div></div>
+    <div class="chart"><canvas id="c-week" role="img" aria-label="{% t 'week_by_region' %}"></canvas></div>
+    <div class="legend" id="lg-week"></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'history_by_region' %}</h2><p>{% t 'kwh_per_hh' %}</p></div></div>
+    <div class="chart"><canvas id="c-hist" role="img" aria-label="{% t 'history_by_region' %}"></canvas></div>
+    <div class="legend" id="lg-hist"></div>
+  </section>
+</div>
+<p class="small mute mt">{% t 'regional_foot' %}</p>
+{% endif %}
+{% endblock %}
+{% block data %}{{ data|json_script:"rg" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('rg'); if (!D) return;
+const {t, num, date, $, esc} = EN, R = D.regions, L = EN.lang;
+const WARN = .80, CRIT = .95;
+let day = 0, heat = 0, hour = 20, sel = null;
+$('#stamp').textContent = t('data_until', {d: date(D.data_until, {day: 'numeric', month: 'long', year: 'numeric'})}) + (D.weather_source === 'climatologie' ? ' · ' + t('weather_climato') : '');
+$('#days').innerHTML = D.dates.map((d, i) => `<button type="button" data-d="${i}" aria-pressed="${i === 0}">${EN.relDay(d, i + 1)} · ${EN.wday(d)} ${date(d, {day: 'numeric'})}</button>`).join('');
+const st = u => u >= CRIT ? 'crit' : u >= WARN ? 'warn' : 'ok';
+const stColor = u => u >= CRIT ? 'var(--harissa)' : u >= WARN ? 'var(--soleil)' : 'var(--olive)';
+// charge du jour + effet du scénario de chaleur (sensibilité apprise par profiles.py)
+function pred(r, d) {
+  const p = r.pred[d], tm = r.tmax[d]; if (p == null) return null;
+  const add = (r.heat_sens || 0) * (Math.max(tm + heat - 24, 0) - Math.max(tm - 24, 0));
+  return p + add;
+}
+const load = (r, d) => { const p = pred(r, d); return p != null && r.record ? p / r.record : null; };
+// 100 % = jour record à son heure de pointe : charge horaire = charge du jour × forme horaire ÷ pic de la forme
+const loadH = (r, d, h) => { const l = load(r, d); return l == null ? null : l * r.shape[h] / Math.max(...r.shape); };
+
+function render() {
+  document.querySelectorAll('#days button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.d === day));
+  $('#heat-v').textContent = '+' + heat + ' °C'; $('#hour-v').textContent = String(hour).padStart(2, '0') + ':00';
+  const cur = R.map(r => ({r, l: load(r, day), lh: loadH(r, day, hour), p: pred(r, day)})).filter(c => c.l != null);
+  const tot = cur.reduce((a, c) => a + c.p * c.r.households, 0), nhh = cur.reduce((a, c) => a + c.r.households, 0);
+  const top = [...cur].sort((a, b) => b.l - a.l)[0];
+  let pk = {v: 0};
+  R.forEach(r => r.shape.forEach((_, h) => { const v = loadH(r, day, h); if (v > pk.v) pk = {v, h, r}; }));
+  $('#kp').innerHTML = `
+    <div class="metric"><div class="lab">${t('demand_total')}</div><div class="val num">${num(tot, 0)}<small>kWh</small></div><div class="sub">${t('for_n_hh', {n: nhh})}</div></div>
+    <div class="metric"><div class="lab">${t('most_loaded')}</div><div class="val">${esc(top.r[L])}</div><div class="sub num">${num(top.l * 100, 0)} % ${t('of_record')}</div></div>
+    <div class="metric"><div class="lab">${t('peak_hour')}</div><div class="val num">${pk.h}:00</div><div class="sub">${esc(pk.r[L])} · <span class="num">${num(pk.v * 100, 0)} %</span></div></div>
+    <div class="metric accent"><div class="lab">${t('model_error')}</div><div class="val num">${num(D.mape, 1)}<small>% MAPE</small></div><div class="sub">${t('baseline')} ${num(D.baseline, 1)} %</div></div>`;
+  // classement
+  $('#rank').innerHTML = [...cur].sort((a, b) => b.lh - a.lh).map(c => `<button type="button" class="bar-row" data-r="${c.r.id}" style="width:100%;border:0;background:${sel === c.r.id ? 'var(--surface-2)' : 'none'};border-radius:8px;cursor:pointer;padding-inline:6px;text-align:start">
+      <span><b>${esc(c.r[L])}</b><br><span class="tiny mute">${c.r.households} ${t('households')} · ${c.r.tmax[day] != null ? num(c.r.tmax[day] + heat, 0) + ' °C' : ''}</span></span>
+      <span class="track"><i style="width:${Math.min(100, c.lh * 100)}%;background:${stColor(c.lh)}"></i></span>
+      <span class="v num">${num(c.lh * 100, 0)} %</span></button>`).join('');
+  const al = cur.filter(c => c.lh >= WARN).sort((a, b) => b.lh - a.lh);
+  $('#alerts').innerHTML = al.length ? al.map(c => `<div class="notice ${c.lh >= CRIT ? 'err' : 'warn'}" style="margin-top:8px"><svg class="i"><use href="#i-alert"/></svg><span><b>${t(c.lh >= CRIT ? 'st_crit' : 'st_warn')}</b> · ${t(c.lh >= CRIT ? 'reg_crit' : 'reg_warn', {r: c.r[L], p: num(c.lh * 100, 0), h: hour})}</span></div>`).join('')
+    : `<div class="notice ok"><svg class="i"><use href="#i-check"/></svg><span>${t('reg_ok', {h: hour})}</span></div>`;
+  // carte schématique
+  let m = `<svg viewBox="0 0 300 330" direction="ltr" style="direction:ltr" role="img" aria-label="${t('map_h')}"><path d="M128 6 L196 8 L222 46 L236 98 L238 150 L222 186 L238 214 L222 246 L196 282 L178 306 L150 326 L124 304 L114 262 L70 220 L56 190 L70 142 L92 108 L96 54 Z" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="1.2"/>`;
+  cur.forEach(c => { const r = c.r, rad = 10 + 16 * Math.min(c.lh, 1.2), col = stColor(c.lh), s = sel === r.id, left = ['toz', 'biz'].includes(r.id), off = Math.max(rad, 10) + 6;
+    m += `<g class="reg" data-r="${r.id}" tabindex="0" role="button" aria-label="${esc(r[L])} ${num(c.lh * 100, 0)} %"><circle cx="${r.x}" cy="${r.y}" r="${rad}" fill="${col}" opacity=".22"/>
+      <circle class="core" cx="${r.x}" cy="${r.y}" r="8" fill="${col}" stroke="${s ? 'var(--ink)' : 'var(--surface)'}" stroke-width="${s ? 3 : 2}"/>
+      <text x="${r.x + (left ? -off : off)}" y="${r.y}" font-size="12" font-weight="600" fill="var(--ink)" text-anchor="${left ? 'end' : 'start'}">${esc(r[L])}</text>
+      <text x="${r.x + (left ? -off : off)}" y="${r.y + 14}" font-size="11" fill="var(--mute)" text-anchor="${left ? 'end' : 'start'}">${num(c.lh * 100, 0)} %</text></g>`; });
+  $('#map').innerHTML = m + '</svg>';
+  // carte de chaleur région × heure (séquentiel une teinte ; cases critiques cerclées)
+  const cw = 26, ch = 30, lw = 84, W = lw + 24 * cw, Hh = R.length * ch + 24;
+  let h = `<svg viewBox="0 0 ${W} ${Hh}" style="min-width:640px;width:100%;direction:ltr" role="img" aria-label="${t('heatmap_h')}">`;
+  const allU = R.flatMap(r => r.shape.map((_, k) => loadH(r, day, k) || 0));
+  const mx = Math.max(...allU), mn = Math.min(...allU), span = Math.max(mx - mn, 1e-6);   // échelle min→max : contraste lisible
+  R.forEach((r, i) => { h += `<text x="${lw - 8}" y="${i * ch + 19}" font-size="12" text-anchor="end" fill="var(--ink)" font-weight="${sel === r.id ? 700 : 500}">${esc(r[L])}</text>`;
+    for (let k = 0; k < 24; k++) { const u = loadH(r, day, k) || 0, a = .10 + .90 * Math.min(Math.max((u - mn) / span, 0), 1);
+      h += `<rect x="${lw + k * cw + 1}" y="${i * ch + 1}" width="${cw - 2}" height="${ch - 2}" rx="4" fill="var(--s1)" fill-opacity="${a.toFixed(2)}" ${u >= CRIT ? 'stroke="var(--harissa)" stroke-width="2.5"' : u >= WARN ? 'stroke="var(--soleil)" stroke-width="2"' : ''}><title>${esc(r[L])} ${k}h : ${num(u * 100, 0)} %</title></rect>`; } });
+  for (let k = 0; k < 24; k += 2) h += `<text x="${lw + k * cw + cw / 2}" y="${R.length * ch + 16}" font-size="10" text-anchor="middle" fill="var(--mute)">${k}h</text>`;
+  h += `<rect x="${lw + hour * cw}" y="0" width="${cw}" height="${R.length * ch}" fill="none" stroke="var(--ink)" stroke-width="2" rx="4"/></svg>`;
+  $('#hm').innerHTML = h + `<div class="legend"><span><i style="background:var(--s1);opacity:.2"></i>${t('low')}</span><span><i style="background:var(--s1)"></i>${t('high')}</span><span><i style="border:2px solid var(--soleil);background:none"></i>${t('st_warn')}</span><span><i style="border:2px solid var(--harissa);background:none"></i>${t('st_crit')}</span></div>`;
+}
+function charts() {
+  const ds = R.map((r, i) => ({label: r[L], data: D.dates.map((_, d) => pred(r, d)), borderColor: EN.series(i), backgroundColor: EN.series(i), tension: .3, pointRadius: 2}));
+  EN.chart('c-week', {type: 'line', data: {labels: D.dates.map(d => EN.wday(d) + ' ' + date(d, {day: 'numeric'})), datasets: ds},
+    options: {scales: {y: {title: {display: true, text: 'kWh'}}, x: {grid: {display: false}}}, plugins: {tooltip: {callbacks: {label: c => `${c.dataset.label} : ${num(c.raw)} kWh`}}}}});
+  $('#lg-week').innerHTML = ds.map(d => `<span><i class="line" style="background:${d.borderColor}"></i>${esc(d.label)}</span>`).join('');
+  const H = D.history, hs = R.map((r, i) => ({label: r[L], data: H.series[r.id] || [], borderColor: EN.series(i), backgroundColor: EN.series(i), tension: .3}));
+  EN.chart('c-hist', {type: 'line', data: {labels: H.months.map(m => EN.month(m, {month: 'short', year: '2-digit'})), datasets: hs},
+    options: {scales: {y: {beginAtZero: true, title: {display: true, text: 'kWh'}}, x: {grid: {display: false}}}, plugins: {tooltip: {callbacks: {label: c => `${c.dataset.label} : ${num(c.raw)} kWh`}}}}});
+  $('#lg-hist').innerHTML = hs.map(d => `<span><i class="line" style="background:${d.borderColor}"></i>${esc(d.label)}</span>`).join('');
+}
+$('#days').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { day = +b.dataset.d; render(); } });
+$('#heat').addEventListener('input', e => { heat = +e.target.value; render(); charts(); });
+$('#hour').addEventListener('input', e => { hour = +e.target.value; render(); });
+document.addEventListener('click', e => { const z = e.target.closest('[data-r]'); if (z) { sel = sel === z.dataset.r ? null : z.dataset.r; render(); } });
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.r) { e.preventDefault(); sel = e.target.dataset.r; render(); } });
+document.addEventListener('themechange', () => { render(); charts(); });
+render(); charts();
+})();
+</script>
+{% endblock %}

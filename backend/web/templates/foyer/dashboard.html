@@ -1,0 +1,221 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_dashboard' %}{% endblock %}
+{% block content %}
+{% if not facts.has_data %}
+<div class="ph"><div><h1>{% t 'hello' %} {{ user.first_name|default:user.username }}</h1><p>{% t 'onb_p' %}</p></div></div>
+<div class="panel">
+  <div class="empty"><svg class="i"><use href="#i-meter"/></svg><h2>{% t 'onb_h' %}</h2>
+    <p class="mute" style="max-width:52ch;margin:8px auto 18px">{% t 'onb_p2' %}</p>
+    <a class="btn btn-primary" href="/foyer/releves/"><svg class="i"><use href="#i-plus"/></svg>{% t 'add_readings' %}</a></div>
+</div>
+{% else %}
+<div class="ph">
+  <div>
+    <h1>{% t 'hello' %} {{ user.first_name|default:user.username }}</h1>
+    <p id="who"></p>
+  </div>
+  <div class="ph-actions">
+    <span class="datastamp"><span class="dot"></span><span id="stamp"></span></span>
+    <a class="btn btn-primary" href="/foyer/releves/"><svg class="i"><use href="#i-plus"/></svg>{% t 'add_reading' %}</a>
+  </div>
+</div>
+
+<section class="metrics" id="metrics" aria-label="{% t 'key_figures' %}"></section>
+
+<div class="grid g-main mt">
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>{% t 'next7' %}</h2><p id="fc-note"></p></div>
+      <span id="conf"></span>
+    </div>
+    <div class="ribbon" id="ribbon" ></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px">
+      <span class="heat-legend">{% t 'cool' %} <i></i> {% t 'hot' %}</span>
+      <span class="small mute">{% t 'band_legend' %}</span>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>{% t 'to_watch' %}</h2><a class="small" href="/foyer/profil/#alertes">{% t 'see_all' %}</a></div>
+    <div id="watch"></div>
+  </section>
+</div>
+
+<section class="panel mt scn" id="scn-panel">
+  <div class="panel-head">
+    <div><span class="eyebrow"><svg class="i"><use href="#i-thermo"/></svg>{% t 'scn_eyebrow' %}</span><h2>{% t 'scn_h' %}</h2><p>{% t 'scn_p' %}</p></div>
+  </div>
+  <div class="scn-grid">
+    <div>
+      <label class="field"><span id="scn-lab"></span><input type="range" id="scn-d" min="0" max="8" step="1" value="4"></label>
+      <div class="scn-kpis" id="scn-k"></div>
+      <div id="scn-note"></div>
+    </div>
+    <div>
+      <div class="chart sm"><canvas id="c-scn" role="img" aria-label="{% t 'scn_h' %}"></canvas></div>
+      <div class="legend"><span><i style="background:var(--s1)"></i>{% t 'scn_base' %}</span><span><i style="background:var(--s2)"></i>{% t 'scn_hot' %}</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel mt">
+  <div class="panel-head">
+    <div><h2>{% t 'my_consumption' %}</h2><p id="cons-note"></p></div>
+    <div class="seg" role="group" id="period">
+      <button type="button" data-p="day">{% t 'p_day' %}</button>
+      <button type="button" data-p="week">{% t 'p_week' %}</button>
+      <button type="button" data-p="month" aria-pressed="true">{% t 'p_month' %}</button>
+      <button type="button" data-p="year">{% t 'p_year' %}</button>
+    </div>
+  </div>
+  <div class="chart"><canvas id="c-cons" role="img" aria-label="{% t 'my_consumption' %}"></canvas></div>
+  <div class="legend" id="cons-legend"></div>
+</section>
+
+<section class="panel mt">
+  <div class="panel-head">
+    <div><h2>{% t 'trust_h' %}</h2><p id="trust-note"></p></div>
+  </div>
+  <div class="chart sm"><canvas id="c-trust" role="img" aria-label="{% t 'trust_h' %}"></canvas></div>
+  <div class="legend"><span><i class="line" style="background:var(--ink)"></i>{% t 'actual' %}</span><span><i class="line" style="background:var(--s1)"></i>{% t 'predicted' %}</span><span><i class="band" style="background:var(--s1)"></i>{% t 'interval' %}</span></div>
+</section>
+{% endif %}
+{% endblock %}
+{% block data %}{{ data|json_script:"dash" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('dash'); if (!D || !D.days) return;
+const {t, num, date, $} = EN, F = D.facts, M = F.month, B = M.bill;
+const mon = t('m' + (M.label_idx + 1));
+$('#who').textContent = `${F.region[EN.lang]} · ${F.persona[EN.lang]}${F.profile ? ' · ' + t('profile') + ' « ' + F.profile.name + ' »' : ''}`;
+$('#stamp').textContent = t('data_until', {d: date(F.data_until, {day: 'numeric', month: 'long', year: 'numeric'})});
+
+// ---- bandeau de métriques
+const last = F.last_day, d30 = F.avg_30d, diff = d30 ? (last.kwh / d30 - 1) * 100 : null;
+const fc0 = F.forecast[0];
+const pe = F.peers, rank = pe && F.profile ? (F.profile.mean_day / pe.mean_day - 1) * 100 : null;
+$('#metrics').innerHTML = `
+ <div class="metric"><div class="lab">${t('last_reading')}</div><div class="val num">${num(last.kwh)}<small>kWh</small></div>
+   <div class="sub">${date(last.date)}${diff != null ? ` · <span class="delta ${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '+' : ''}${num(diff, 0)} %</span> ${t('vs_30d')}` : ''}</div></div>
+ <div class="metric"><div class="lab">${fc0 && EN.isToday(fc0.date) ? t('today_fc') : fc0 && EN.isTomorrow(fc0.date) ? t('tomorrow_fc') : t('fc_j1')}</div><div class="val num">${fc0 ? num(fc0.pred) : '–'}<small>kWh</small></div>
+   <div class="sub">${fc0 ? t('between', {a: num(fc0.q10), b: num(fc0.q90)}) : t('no_forecast')}</div></div>
+ <div class="metric accent"><div class="lab">${t('bill_of', {m: mon})}</div><div class="val num">${num(B.total, 0)}<small>DT</small></div>
+   <div class="sub">${num(M.projection_kwh, 0)} kWh ${t('projected')} · ${t('excl_tax')}</div></div>
+ <div class="metric"><div class="lab">${t('vs_similar')}</div><div class="val num">${rank == null ? '–' : (rank > 0 ? '+' : '') + num(rank, 0) + ' %'}</div>
+   <div class="sub">${pe ? t('vs_similar_sub', {n: pe.n, v: num(pe.mean_day)}) : ''}</div></div>`;
+
+// ---- ruban de prévision
+EN.ribbon($('#ribbon'), F.forecast, {height: 170, tomorrow: true});
+const ws = F.forecast[0] && F.forecast[0].weather;
+$('#fc-note').textContent = t('fc_note') + (ws === 'climatologie' ? ' ' + t('fc_climato') : '');
+if (F.confidence) $('#conf').innerHTML = `<span class="badge ${F.confidence === 'haute' ? 'b-ok' : F.confidence === 'moyenne' ? 'b-mid' : 'b-high'}"><svg class="i"><use href="#i-shield"/></svg>${t('confidence')} ${t('conf_' + F.confidence)}</span>`;
+
+// ---- à surveiller : alertes + seuil de tranche + chaleur
+let w = '';
+F.alerts.slice(0, 3).forEach(a => {
+  w += `<div class="alert-item"><span class="sev ${a.severity}"><svg class="i"><use href="#i-alert"/></svg></span>
+   <div><h3>${t('atype_' + a.type)}</h3><p>${date(a.date, {day: 'numeric', month: 'long'})}${a.kwh && a.expected ? ' · ' + t('alert_vals', {k: num(a.kwh), e: num(a.expected)}) : ''}</p></div>${EN.sevBadge(a.severity)}</div>`;
+});
+if (B.next_band && B.next_band.room_kwh < 60) w += `<div class="notice warn" style="margin-top:12px"><svg class="i"><use href="#i-bill"/></svg><span>${t('band_warn', {k: num(B.next_band.room_kwh, 0), d: num(B.next_band.jump_dt, 0)})}</span></div>`;
+if (F.hot_days.length) w += `<div class="notice warn" style="margin-top:12px"><svg class="i"><use href="#i-thermo"/></svg><span>${t('hot_warn', {n: F.hot_days.length})}</span></div>`;
+if (!w) w = `<div class="notice ok"><svg class="i"><use href="#i-check"/></svg><span>${t('all_good')}</span></div>`;
+w += `<a class="btn btn-sm" style="margin-top:14px" href="/foyer/assistant/?q=${encodeURIComponent(t('chip_alert'))}"><svg class="i"><use href="#i-chat"/></svg>${t('ask_assistant')}</a>`;
+$('#watch').innerHTML = w;
+
+// ---- graphique de consommation
+const css = EN.css;
+function cons(p) {
+  document.querySelectorAll('#period button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === p));
+  let labels, vals, colors, legend = '', note = '';
+  if (p === 'day') {
+    const H = D.hourly || {}, s = H.summer ? 'summer' : 'all';
+    labels = [...Array(24).keys()].map(h => h + 'h');
+    const ds = [];
+    if (H.summer) ds.push({label: t('summer'), data: H.summer, borderColor: css('--s2'), backgroundColor: css('--s2'), tension: .35, pointRadius: 0});
+    if (H.winter) ds.push({label: t('winter'), data: H.winter, borderColor: css('--s1'), backgroundColor: css('--s1'), tension: .35, pointRadius: 0});
+    if (!ds.length && H.all) ds.push({label: t('typical_day'), data: H.all, borderColor: css('--s1'), tension: .35});
+    EN.chart('c-cons', {type: 'line', data: {labels, datasets: ds}, options: {scales: {y: {title: {display: true, text: 'kWh / h'}, beginAtZero: true}}, plugins: {tooltip: {callbacks: {label: c => `${c.dataset.label} : ${num(c.raw, 2)} kWh`}}}}});
+    $('#cons-legend').innerHTML = ds.map(d => `<span><i class="line" style="background:${d.borderColor}"></i>${d.label}</span>`).join('') + `<span class="mute">${t('evening_band')}</span>`;
+    $('#cons-note').textContent = ds.length ? t('typical_note') : t('no_hourly');
+    return;
+  }
+  if (p === 'year') {
+    labels = D.months.map(m => EN.month(m.month, {month: 'short', year: '2-digit'}));
+    vals = D.months.map(m => m.kwh);
+    colors = D.months.map(() => css('--s1'));
+    note = t('year_note');
+  } else {
+    const n = p === 'week' ? 7 : 30, sl = D.days.slice(-n);
+    labels = sl.map(d => p === 'week' ? EN.wday(d.date) + ' ' + date(d.date, {day: 'numeric'}) : date(d.date));
+    vals = sl.map(d => d.kwh);
+    colors = sl.map(d => d.anomaly ? css('--harissa') : css('--s1'));
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    note = t('avg_period', {v: num(avg)});
+    legend = `<span><i style="background:${css('--s1')}"></i>${t('daily_kwh')}</span><span><i style="background:${css('--harissa')}"></i>${t('anomalous_day')}</span>`;
+    var tm = sl.map(d => d.tmax);
+  }
+  EN.chart('c-cons', {type: 'bar', data: {labels, datasets: [{data: vals, backgroundColor: colors, maxBarThickness: 34}]},
+    options: {scales: {x: {grid: {display: false}}, y: {beginAtZero: true, title: {display: true, text: 'kWh'}}},
+      plugins: {tooltip: {callbacks: {label: c => `${num(c.raw)} kWh` + (typeof tm !== 'undefined' && tm[c.dataIndex] != null ? ` · ${num(tm[c.dataIndex], 0)} °C` : '')}}}}});
+  $('#cons-legend').innerHTML = legend; $('#cons-note').textContent = note;
+}
+let cur = 'month';
+document.getElementById('period').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { cur = b.dataset.p; cons(cur); } });
+cons(cur);
+
+// ---- le modèle a-t-il vu juste ?
+function trust() {
+  const bt = D.backtest;
+  if (!bt.length) {   // nouveau foyer : pas encore de prévision comparable à un relevé -> pas de graphique vide
+    $('#trust-note').textContent = t('no_backtest_new');
+    const cv = document.getElementById('c-trust'); const box = cv && cv.closest('.chart');
+    if (box) { box.style.display = 'none'; if (box.nextElementSibling && box.nextElementSibling.classList.contains('legend')) box.nextElementSibling.style.display = 'none'; }
+    return;
+  }
+  const mape = bt.reduce((a, r) => a + Math.abs(r.actual - r.pred) / r.actual, 0) / bt.length * 100;
+  $('#trust-note').textContent = t('trust_note', {n: bt.length, m: num(mape, 1)});
+  const s1 = css('--s1');
+  EN.chart('c-trust', {type: 'line', data: {labels: bt.map(r => date(r.date)), datasets: [
+    {label: 'q90', data: bt.map(r => r.q90), borderWidth: 0, backgroundColor: EN.alpha(s1, .16), fill: '+1', pointRadius: 0},
+    {label: 'q10', data: bt.map(r => r.q10), borderWidth: 0, pointRadius: 0, fill: false},
+    {label: t('predicted'), data: bt.map(r => r.pred), borderColor: s1, tension: .3},
+    {label: t('actual'), data: bt.map(r => r.actual), borderColor: css('--ink'), pointRadius: 3, pointBackgroundColor: css('--ink'), borderDash: [4, 3], tension: .3}]},
+    options: {plugins: {tooltip: {filter: i => i.datasetIndex > 1, callbacks: {label: c => `${c.dataset.label} : ${num(c.raw)} kWh`}}}, scales: {x: {grid: {display: false}}, y: {title: {display: true, text: 'kWh'}}}}});
+}
+trust();
+
+// ---- jumeau numérique : scénario de canicule calculé par les modèles (GET /api/foyer/scenario/)
+let S = null, sTimer;
+// signe explicite : « +3 », « −1 », « 0 » (évite « +-0 »)
+const sg = (v, d) => { const r = Number(num(Math.abs(v), d).replace(/\s/g, '').replace(',', '.')); return r === 0 ? num(0, d) : (v > 0 ? '+' : '−') + num(Math.abs(v), d); };
+async function scenario() {
+  const d = +$('#scn-d').value; $('#scn-lab').textContent = t('scn_delta', {d});
+  $('#scn-k').classList.add('busy');
+  S = await EN.get('/api/foyer/scenario/?delta=' + d);
+  $('#scn-k').classList.remove('busy');
+  if (!S || !S.days) { $('#scn-k').innerHTML = `<p class="mute">${esc(S && S.detail || t('no_forecast'))}</p>`; return; }
+  $('#scn-k').innerHTML = `
+    <div><span>${t('scn_week')}</span><b class="num">${num(S.scenario_kwh, 0)} <small>kWh</small></b><em class="num">${num(S.base_kwh, 0)} kWh</em></div>
+    <div><span>${t('scn_extra')}</span><b class="num ${S.extra_pct >= 1 ? 'up' : ''}">${sg(S.extra_pct, 0)} %</b><em class="num">${sg(S.scenario_kwh - S.base_kwh, 0)} kWh</em></div>
+    <div><span>${t('scn_bill')}</span><b class="num">${num(S.bill_scenario, 0)} <small>DT</small></b><em class="num">${sg(S.bill_scenario - S.bill_base, 0)} DT</em></div>`;
+  $('#scn-note').innerHTML = (S.band_change ? `<div class="notice warn"><svg class="i"><use href="#i-bill"/></svg><span>${t('scn_band', {b: esc(S.band_label)})}</span></div>` : '')
+    + (d > 0 && Math.abs(S.extra_pct) < 1
+        ? `<div class="notice info" style="margin-top:10px"><svg class="i"><use href="#i-thermo"/></svg><span>${t('scn_flat', {t: num(Math.max(...S.days.map(x => x.tmax_sc)), 0)})}</span></div>`
+        : d > 0 ? `<div class="notice ok" style="margin-top:10px"><svg class="i"><use href="#i-leaf"/></svg><span>${t('scn_tip')}</span></div>` : '');
+  drawScn();
+}
+function drawScn() {
+  if (!S || !S.days) return; const c = EN.css;
+  EN.chart('c-scn', {type: 'bar', data: {labels: S.days.map(x => EN.wday(x.date) + ' ' + date(x.date, {day: 'numeric'})), datasets: [
+    {label: t('scn_base'), data: S.days.map(x => x.base), backgroundColor: c('--s1'), maxBarThickness: 22},
+    {label: t('scn_hot'), data: S.days.map(x => x.scenario), backgroundColor: c('--s2'), maxBarThickness: 22}]},
+    options: {scales: {x: {grid: {display: false}}, y: {beginAtZero: true, title: {display: true, text: 'kWh'}}},
+      plugins: {tooltip: {callbacks: {label: k => `${k.dataset.label} : ${num(k.raw)} kWh · ${num(k.datasetIndex ? S.days[k.dataIndex].tmax_sc : S.days[k.dataIndex].tmax, 0)} °C`}}}}});
+}
+const esc = EN.esc;
+$('#scn-d').addEventListener('input', () => { $('#scn-lab').textContent = t('scn_delta', {d: $('#scn-d').value}); clearTimeout(sTimer); sTimer = setTimeout(scenario, 250); });
+scenario();
+document.addEventListener('themechange', () => { cons(cur); trust(); drawScn(); });
+})();
+</script>
+{% endblock %}

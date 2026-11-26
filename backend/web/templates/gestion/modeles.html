@@ -1,0 +1,133 @@
+{% extends "base.html" %}{% load tr %}
+{% block title %}{% t 'nav_models' %}{% endblock %}
+{% block content %}
+<div class="ph"><div><h1>{% t 'nav_models' %}</h1><p>{% t 'models_p' %}</p></div><span class="datastamp" id="inf"></span></div>
+<section class="metrics" id="kp"></section>
+
+<div class="grid g-main mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'drift_h' %}</h2><p id="drift-p"></p></div><span id="drift-badge"></span></div>
+    <div class="drift-kpis" id="drift-k"></div>
+    <div class="chart sm"><canvas id="c-drift" role="img" aria-label="{% t 'drift_h' %}"></canvas></div>
+    <div class="legend"><span><i class="line" style="background:var(--s1)"></i>{% t 'rolling_mape' %}</span><span><i class="line" style="background:var(--soleil)"></i>{% t 'drift_ref' %}</span></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'health_h' %}</h2><p>{% t 'health_p' %}</p></div><span id="health-badge"></span></div>
+    <ul class="checks" id="checks"></ul>
+    <div id="files" class="files"></div>
+  </section>
+</div>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'predict_h' %}</h2><p>{% t 'predict_p' %}</p></div></div>
+  <form id="pred" class="pred-form">
+    <select class="input" id="pred-h" aria-label="{% t 'linked_hh' %}"></select>
+    <button class="btn btn-primary" type="submit"><svg class="i"><use href="#i-model"/></svg>{% t 'predict_btn' %}</button>
+    <span class="small mute" id="pred-msg"></span>
+  </form>
+  <div class="ribbon mt" id="pred-out"></div>
+</section>
+
+<div class="grid g2 mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'compare_h' %}</h2><p>{% t 'compare_p' %}</p></div><div class="seg" id="hz" role="group"><button type="button" data-h="forecast_h1" aria-pressed="true">J+1</button><button type="button" data-h="forecast_h7">J+7</button></div></div>
+    <div class="table-wrap"><table class="t" id="cmp"></table></div>
+    <p class="small mute" id="cmp-note" style="margin-top:10px"></p>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'err_by_region' %}</h2><p>{% t 'err_by_region_p' %}</p></div></div>
+    <div class="chart"><canvas id="c-reg" role="img" aria-label="{% t 'err_by_region' %}"></canvas></div>
+    <div class="legend"><span><i style="background:var(--s1)"></i>{% t 'model' %}</span><span><i style="background:var(--s2)"></i>{% t 'baseline' %}</span></div>
+  </section>
+</div>
+
+<section class="panel mt">
+  <div class="panel-head"><div><h2>{% t 'err_daily' %}</h2><p>{% t 'err_daily_p' %}</p></div></div>
+  <div class="chart sm"><canvas id="c-day" role="img" aria-label="{% t 'err_daily' %}"></canvas></div>
+</section>
+
+<div class="grid g2 mt">
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'profiles_names' %}</h2><p>{% t 'profiles_names_p' %}</p></div></div>
+    <form id="ren" style="display:grid;gap:10px"></form>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><div><h2>{% t 'model_cards' %}</h2><p>{% t 'model_cards_p' %}</p></div></div>
+    <div id="cards"></div>
+  </section>
+</div>
+<p class="small mute mt">{% t 'synthetic_scores' %}</p>
+{% endblock %}
+{% block data %}{{ data|json_script:"md" }}{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+const D = EN.data('md'), {t, num, date, $, esc} = EN, Q = D.quality, R = D.runs, L = EN.lang;
+const I = D.inference;
+$('#inf').textContent = I.last ? t('inference_last', {d: new Date(I.last).toLocaleString(EN.loc, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}), n: I.households}) : t('no_inference');
+const h1 = R.forecast_h1 ? R.forecast_h1.active : {}, an = R.anomalies ? R.anomalies.active : {}, pr = R.profiles ? R.profiles.active : {};
+const ens = (h1.test || {}).ensemble || {}, base = (h1.test || {})['baseline (même jour sem. dernière)'] || {};
+const ret = an.test && an.retained ? an.test[an.retained] : null;
+$('#kp').innerHTML = `<div class="metric accent"><div class="lab">${t('mape_j1')}</div><div class="val num">${num(ens['MAPE_%'], 2)}<small>%</small></div><div class="sub">${t('baseline')} ${num(base['MAPE_%'], 1)} % · ${t('gain')} ${num(h1['gain_mae_vs_baseline_%'], 0)} %</div></div>
+ <div class="metric"><div class="lab">${t('coverage')}</div><div class="val num">${num((h1.interval_coverage || 0) * 100, 0)}<small>%</small></div><div class="sub">${t('target')} ${num((h1.coverage_target || .8) * 100, 0)} % · ${t('live')} ${num(Q.coverage, 0)} %</div></div>
+ <div class="metric"><div class="lab">${t('anomaly_f1')}</div><div class="val num">${ret ? num(ret.F1, 2) : '–'}</div><div class="sub">${ret ? t('prec_rec', {p: num(ret.precision, 2), r: num(ret.rappel, 2)}) : ''}</div></div>
+ <div class="metric"><div class="lab">${t('profiles_k')}</div><div class="val num">${pr.k || '–'}</div><div class="sub">ARI ${num(pr.ari_vs_personas, 2)}</div></div>`;
+let hz = 'forecast_h1';
+function cmp() {
+  document.querySelectorAll('#hz button').forEach(b => b.setAttribute('aria-pressed', b.dataset.h === hz));
+  const m = (R[hz] || {}).active || {}, T = m.test || {};
+  const best = Math.min(...Object.values(T).map(x => x['MAPE_%']));
+  $('#cmp').innerHTML = `<thead><tr><th>${t('model')}</th><th class="n">MAE</th><th class="n">RMSE</th><th class="n">MAPE</th><th class="n">sMAPE</th><th class="n">${t('weight')}</th></tr></thead><tbody>` +
+    Object.entries(T).map(([k, v]) => { const w = (m.weights || {})[{'random forest': 'rf', 'hgb': 'hgb', 'ridge': 'ridge'}[k]];
+      return `<tr><td>${esc(k)}</td><td class="n num">${num(v.MAE, 2)}</td><td class="n num">${num(v.RMSE, 2)}</td><td class="n num ${v['MAPE_%'] === best ? 'best' : ''}">${num(v['MAPE_%'], 2)} %</td><td class="n num">${num(v['sMAPE_%'], 2)} %</td><td class="n num">${w != null ? num(w * 100, 0) + ' %' : '–'}</td></tr>`; }).join('') + '</tbody>';
+  $('#cmp-note').textContent = m.trained_at ? t('trained_note', {d: date(m.trained_at, {day: 'numeric', month: 'long', year: 'numeric'}), n: num(m.n_train, 0), m: num(m.n_test, 0), s: m.sklearn || '?'}) : '';
+}
+cmp(); $('#hz').onclick = e => { const b = e.target.closest('button'); if (b) { hz = b.dataset.h; cmp(); } };
+function draw() {
+  if (!Q.n) return; const c = EN.css;
+  EN.chart('c-reg', {type: 'bar', data: {labels: Q.by_region.map(r => r[L]), datasets: [
+    {label: t('model'), data: Q.by_region.map(r => r.mape), backgroundColor: c('--s1'), maxBarThickness: 26}, {label: t('baseline'), data: Q.by_region.map(r => r.base), backgroundColor: c('--s2'), maxBarThickness: 26}]},
+    options: {datasets: {bar: {borderColor: c('--surface'), borderWidth: 2, borderSkipped: false}}, scales: {x: {grid: {display: false}}, y: {beginAtZero: true, title: {display: true, text: 'MAPE %'}}}, plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${num(x.raw, 1)} %`}}}}});
+  EN.chart('c-day', {type: 'line', data: {labels: Q.by_day.map(d => date(d.date)), datasets: [{label: 'MAPE', data: Q.by_day.map(d => d.mape), borderColor: c('--s1'), backgroundColor: EN.alpha(c('--s1'), .12), fill: true, tension: .25}]},
+    options: {scales: {x: {grid: {display: false}, ticks: {maxTicksLimit: 10}}, y: {beginAtZero: true, title: {display: true, text: 'MAPE %'}}}, plugins: {tooltip: {callbacks: {label: x => `MAPE : ${num(x.raw, 1)} %`}}}}});
+}
+draw(); document.addEventListener('themechange', draw);
+$('#ren').innerHTML = D.clusters.map(c => `<label class="field"><span>${t('cluster_n', {n: c.cluster + 1})} · ${c.n} ${t('households')}</span><input class="input" name="c${c.cluster}" data-c="${c.cluster}" value="${esc(c.profil)}" maxlength="150"></label>`).join('') + `<button class="btn btn-primary" type="submit" style="justify-self:start">${t('save_names')}</button>`;
+$('#ren').addEventListener('submit', async e => { e.preventDefault();
+  const names = Object.fromEntries([...e.target.querySelectorAll('[data-c]')].map(i => [i.dataset.c, i.value]));
+  const r = await EN.post('/gestion/profils/', {names}); EN.toast(r.ok ? t('saved') : t(r.error), !r.ok); });
+const card = (k, lab) => { const x = R[k]; if (!x) return ''; return `<div class="alert-item"><span class="sev basse"><svg class="i"><use href="#i-model"/></svg></span><div><h3>${lab}</h3><p class="small">${t('trained_on', {d: x.trained_at ? date(x.trained_at, {day: 'numeric', month: 'short', year: 'numeric'}) : '–'})}${x.history.length > 1 ? ' · ' + t('n_versions', {n: x.history.length}) : ''}</p></div><span class="badge b-ok">${t('active')}</span></div>`; };
+$('#cards').innerHTML = card('forecast_h1', t('step_forecast_h1')) + card('forecast_h7', t('step_forecast_h7')) + card('profiles', t('step_profiles')) + card('anomalies', t('step_anomalies'))
+  + `<p class="small mute" style="margin-top:10px">${t('files_ok', {a: I.files[1].exists ? '✓' : '✗', b: I.files[7].exists ? '✓' : '✗'})}</p>`;
+// ---- santé de la liaison Django <-> ML
+const HL = D.health, DR = D.drift;
+$('#health-badge').innerHTML = `<span class="badge ${HL.score === HL.total ? 'b-ok' : 'b-mid'}"><svg class="i"><use href="#i-shield"/></svg>${t('health_score', {a: HL.score, b: HL.total})}</span>`;
+$('#checks').innerHTML = HL.checks.map(c => `<li class="${c.ok ? 'ok' : 'ko'}"><span class="ck"><svg class="i"><use href="#i-${c.ok ? 'check' : 'alert'}"/></svg></span><span>${t('hc_' + c.k)}${c.a != null ? ` <span class="mute num">(${esc(c.a)}${c.b != null ? ' / ' + esc(c.b) : ''})</span>` : ''}</span></li>`).join('');
+$('#files').innerHTML = HL.files.map(f => `<div class="file"><svg class="i"><use href="#i-model"/></svg><div><b class="num">${esc(f.name)}</b><span class="small mute">${f.exists ? `${num(f.size_mb, 1)} Mo · ${t('features_n', {n: f.n_features || '–'})} · ${(f.members || []).filter(m => !m.startsWith('q') && m !== 'lin').join(' + ') + ((f.members || []).includes('lin') ? ' · ' + t('hybrid') : '')}` : '✗'}</span></div></div>`).join('');
+// ---- dérive
+if (DR) {
+  $('#drift-p').textContent = t('drift_p', {w: DR.window});
+  const cls = {ok: 'b-ok', watch: 'b-mid', drift: 'b-high'}[DR.status] || '';
+  $('#drift-badge').innerHTML = DR.status ? `<span class="badge ${cls}">${t('drift_' + DR.status)}</span>` : '';
+  $('#drift-k').innerHTML = `<div><span class="mute small">${t('drift_now')}</span><b class="num">${num(DR.current_mape, 2)} %</b></div><div><span class="mute small">${t('drift_ref')}</span><b class="num">${num(DR.reference_mape, 2)} %</b></div><div><span class="mute small">Ratio</span><b class="num">× ${num(DR.ratio, 2)}</b></div><div class="small mute" style="align-self:end">${t('drift_worst', {d: date(DR.worst_day.date, {day: 'numeric', month: 'long'}), m: num(DR.worst_day.mape, 1)})}</div>`;
+}
+function drawDrift() {
+  if (!DR) return; const c = EN.css;
+  EN.chart('c-drift', {type: 'line', data: {labels: DR.series.map(d => date(d.date)), datasets: [
+    {label: t('rolling_mape'), data: DR.series.map(d => d.mape), borderColor: c('--s1'), backgroundColor: EN.alpha(c('--s1'), .10), fill: true, tension: .3},
+    {label: t('drift_ref'), data: DR.series.map(() => DR.reference_mape), borderColor: c('--soleil'), borderDash: [6, 4], borderWidth: 2}]},
+    options: {scales: {x: {grid: {display: false}, ticks: {maxTicksLimit: 8}}, y: {beginAtZero: true, title: {display: true, text: 'MAPE %'}}}, plugins: {tooltip: {callbacks: {label: x => `${x.dataset.label} : ${num(x.raw, 2)} %`}}}}});
+}
+drawDrift(); document.addEventListener('themechange', drawDrift);
+// ---- prédiction à la demande (POST /api/ml/predict/)
+$('#pred-h').innerHTML = D.households.map(([id, r]) => `<option value="${esc(id)}">${esc(id)} · ${esc(r)}</option>`).join('');
+$('#pred').addEventListener('submit', async e => {
+  e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true; $('#pred-msg').textContent = t('loading');
+  const t0 = performance.now(); const r = await EN.post('/api/ml/predict/', {household_id: $('#pred-h').value}); btn.disabled = false;
+  if (!r.forecasts || !r.forecasts.length) { $('#pred-msg').textContent = r.detail || t('e_server'); return; }
+  $('#pred-msg').textContent = t('predict_done', {n: r.forecasts.length, ms: Math.round(performance.now() - t0)});
+  EN.ribbon($('#pred-out'), r.forecasts.map(f => ({date: f.target_date, pred: f.predicted_kwh, q10: f.q10, q90: f.q90, tmax: f.tmax_used})), {height: 110});
+});
+})();
+</script>
+{% endblock %}
